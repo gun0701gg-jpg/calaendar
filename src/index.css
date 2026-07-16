@@ -1,0 +1,382 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic",
+    sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+button {
+  font-family: inherit;
+}
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn--primary {
+  background: #4f46e5;
+  color: white;
+}
+
+.btn--primary:hover {
+  background: #4338ca;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: #475569;
+}
+
+.btn--ghost:hover {
+  background: #e2e8f0;
+}
+
+.btn--danger {
+  color: #dc2626;
+}
+
+.btn--sm {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.btn--lg {
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Loading & Login */
+
+.loading-screen,
+.login-screen {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.login-card {
+  text-align: center;
+  background: white;
+  border-radius: 16px;
+  padding: 40px 32px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  max-width: 360px;
+}
+
+.login-card h1 {
+  margin-top: 0;
+  font-size: 22px;
+}
+
+.login-card p {
+  color: #64748b;
+  margin-bottom: 24px;
+}
+
+/* App shell */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header-title h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.app-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header-month {
+  font-weight: 600;
+  min-width: 90px;
+  text-align: center;
+}
+
+.app-header-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.app-header-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.app-header-name {
+  font-size: 14px;
+  color: #475569;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (min-width: 900px) {
+  .app-main {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .calendar {
+    flex: 3;
+  }
+
+  .day-panel {
+    flex: 2;
+    position: sticky;
+    top: 76px;
+  }
+}
+
+/* Calendar */
+
+.calendar {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f1f5f9;
+}
+
+.calendar-weekday {
+  text-align: center;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-day {
+  aspect-ratio: 1 / 1;
+  border: none;
+  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  cursor: pointer;
+  gap: 4px;
+}
+
+.calendar-day:hover {
+  background: #f8fafc;
+}
+
+.calendar-day--muted {
+  color: #cbd5e1;
+}
+
+.calendar-day--selected {
+  background: #eef2ff;
+}
+
+.calendar-day--today .calendar-day-number {
+  background: #4f46e5;
+  color: white;
+  border-radius: 50%;
+}
+
+.calendar-day-number {
+  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-day-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+}
+
+.calendar-day-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.calendar-day-more {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+/* Day panel */
+
+.day-panel {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+}
+
+.day-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.day-panel-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.schedule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-empty {
+  color: #94a3b8;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.schedule-item {
+  border-left: 4px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.schedule-item-main {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.schedule-item-time {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.schedule-item-meta {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.schedule-item-author {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedule-item-memo {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  white-space: pre-wrap;
+}
+
+.schedule-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Schedule form */
+
+.schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.form-field input,
+.form-field textarea {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 400;
+  color: #1e293b;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
