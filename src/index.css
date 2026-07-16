@@ -532,7 +532,7 @@ button {
   color: #475569;
 }
 
-.form-field input,
+.form-field input:not([type="checkbox"]),
 .form-field textarea {
   font-family: inherit;
   font-size: 14px;
@@ -541,6 +541,37 @@ button {
   border-radius: 8px;
   font-weight: 400;
   color: #1e293b;
+}
+
+.form-field-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.form-field-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.time-select-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.time-select-row select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 400;
+  color: #1e293b;
+  background: white;
+  flex: 1;
 }
 
 .form-actions {
