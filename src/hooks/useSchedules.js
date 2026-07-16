@@ -100,6 +100,7 @@ export async function bulkImportSchedules(entries, { authorUid, authorName, colo
         authorUid,
         authorName,
         importBatch,
+        order: entry.order ?? 0,
         createdAt: serverTimestamp()
       });
     }

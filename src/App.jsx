@@ -35,7 +35,10 @@ function CalendarApp() {
   const { schedules } = useSchedules(gridStart, gridEnd);
 
   const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
-  const daySchedules = schedules.filter((s) => s.date === selectedDateStr);
+  const daySchedules = schedules
+    .filter((s) => s.date === selectedDateStr)
+    .slice()
+    .sort((a, b) => (a.importBatch ? a.order ?? 0 : -1) - (b.importBatch ? b.order ?? 0 : -1));
 
   const handleCreate = (values) =>
     createSchedule({

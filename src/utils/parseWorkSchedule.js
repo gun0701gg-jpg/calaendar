@@ -84,12 +84,15 @@ export function parseWorkScheduleRows(rows, { year, month, targetNames = DEFAULT
 
   const targetSet = new Set(targetNames.map(normalize));
   const entries = [];
+  let order = 0; // 엑셀에 등장하는 행 순서대로 부여 (캘린더에 표시할 때 이 순서를 따른다)
 
   for (let r = firstEmployeeRow; r < rows.length; r++) {
     const row = rows[r];
     const name = normalize(row[nameColIndex]);
     if (!name) break; // 직원 목록 끝(합계/범례 행 시작)
     if (!targetSet.has(name)) continue;
+
+    const rowOrder = order++;
 
     for (const { col, day } of dayColumns) {
       const code = normalize(row[col]);
@@ -100,11 +103,11 @@ export function parseWorkScheduleRows(rows, { year, month, targetNames = DEFAULT
 
       if (holiday) {
         if (code === "D") {
-          entries.push({ date: dateStr, title: name });
+          entries.push({ date: dateStr, title: name, order: rowOrder });
         }
       } else if (code !== "D") {
         const title = code === "F" ? `${name} F` : `${name} (${code})`;
-        entries.push({ date: dateStr, title });
+        entries.push({ date: dateStr, title, order: rowOrder });
       }
     }
   }

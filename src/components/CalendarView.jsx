@@ -50,7 +50,10 @@ export default function CalendarView({ currentMonth, schedules, selectedDate, on
 
           // 일정(직접 등록)은 색 배경 칩으로, 근무현황(엑셀 가져오기)은 배경 없이 요일에 따른 글자색으로 구분
           const regularEvents = daySchedules.filter((s) => !s.importBatch);
-          const workEvents = daySchedules.filter((s) => s.importBatch);
+          const workEvents = daySchedules
+            .filter((s) => s.importBatch)
+            .slice()
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
           const workText = workEvents
             .map((s) => `${s.time ? s.time + " " : ""}${s.title}`)
             .join(", ");
