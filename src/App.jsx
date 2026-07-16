@@ -35,10 +35,8 @@ function CalendarApp() {
   const { schedules } = useSchedules(gridStart, gridEnd);
 
   const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
-  const daySchedules = schedules
-    .filter((s) => s.date === selectedDateStr)
-    .slice()
-    .sort((a, b) => (a.importBatch ? a.order ?? 0 : -1) - (b.importBatch ? b.order ?? 0 : -1));
+  // 일별 일정 패널은 직접 등록한 일정만 보여주고, 엑셀로 올린 근무현황은 캘린더 칸에만 표시한다.
+  const daySchedules = schedules.filter((s) => s.date === selectedDateStr && !s.importBatch);
 
   const handleCreate = (values) =>
     createSchedule({

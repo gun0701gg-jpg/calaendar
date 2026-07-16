@@ -84,9 +84,17 @@ button {
   max-width: 360px;
 }
 
+.login-card .brand-mark {
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
 .login-card h1 {
   margin-top: 0;
-  font-size: 22px;
+  font-size: 20px;
+  font-family: "Noto Sans KR", sans-serif;
+  font-weight: 900;
+  color: #1c2a45;
 }
 
 .login-card p {
@@ -115,9 +123,81 @@ button {
   z-index: 10;
 }
 
+.app-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .app-header-title h1 {
-  font-size: 18px;
+  font-size: 17px;
   margin: 0;
+  font-family: "Noto Sans KR", sans-serif;
+  font-weight: 900;
+  color: #1c2a45;
+  white-space: nowrap;
+}
+
+.app-header-divider {
+  width: 1px;
+  height: 24px;
+  background: #e2e8f0;
+}
+
+/* withon 브랜드 마크 (심볼 + 워드마크) */
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-symbol {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.brand-mark--lg .brand-symbol {
+  width: 56px;
+  height: 56px;
+}
+
+.brand-wordblock {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brand-word {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+}
+
+.brand-mark--lg .brand-word {
+  font-size: 28px;
+}
+
+.brand-word-with {
+  color: #2b3f6b;
+}
+
+.brand-word-on {
+  color: #f97316;
+  font-weight: 700;
+}
+
+.brand-caption {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #2b3f6b;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.brand-mark--lg .brand-caption {
+  font-size: 11px;
 }
 
 .app-header-nav {

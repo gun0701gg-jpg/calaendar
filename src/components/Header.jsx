@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
+import BrandMark from "./BrandMark";
 
 export default function Header({ currentMonth, onPrevMonth, onNextMonth, onToday, onOpenUpload }) {
   const { user, logout } = useAuth();
@@ -7,7 +8,9 @@ export default function Header({ currentMonth, onPrevMonth, onNextMonth, onToday
   return (
     <header className="app-header">
       <div className="app-header-title">
-        <h1>위드온 팀 캘린더</h1>
+        <BrandMark size="sm" />
+        <span className="app-header-divider" />
+        <h1>위드온빌리지 캘린더</h1>
       </div>
       <div className="app-header-nav">
         <button className="btn btn--ghost btn--sm" onClick={onPrevMonth}>
