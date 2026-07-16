@@ -617,3 +617,273 @@ button {
   background: #dcfce7;
   color: #15803d;
 }
+
+.modal--wide {
+  max-width: 640px;
+}
+
+/* Header view tabs / chips */
+
+.app-header-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #475569;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: #f1f5f9;
+}
+
+.chip--active {
+  background: #2b3f6b;
+  border-color: #2b3f6b;
+  color: white;
+}
+
+.app-main--single {
+  display: block;
+}
+
+/* Consultation view */
+
+.consultation-view {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+}
+
+.consultation-view-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.consultation-view-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #1c2a45;
+}
+
+.consultation-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-right: auto;
+}
+
+.consultation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.consultation-card {
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: inherit;
+}
+
+.consultation-card:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.consultation-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.consultation-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1c2a45;
+}
+
+.consultation-card-status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.consultation-card-meta {
+  font-size: 13px;
+  color: #64748b;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.consultation-card-snippet {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.consultation-card-snippet-date {
+  color: #94a3b8;
+  margin-right: 4px;
+}
+
+.consultation-card-snippet--empty {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Consultation form */
+
+.consultation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2b3f6b;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.consultation-form .form-section-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.form-field select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 400;
+  color: #1e293b;
+  background: white;
+}
+
+/* Consultation detail modal */
+
+.consultation-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.consultation-detail-header h2 {
+  margin: 0 0 6px;
+}
+
+.consultation-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px 20px;
+  margin: 0 0 12px;
+}
+
+.consultation-info-grid dt {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}
+
+.consultation-info-grid dd {
+  margin: 0;
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.consultation-log-section {
+  margin-top: 20px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 16px;
+}
+
+.consultation-log-section h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: #1c2a45;
+}
+
+.consultation-log-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.consultation-log-form textarea {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.consultation-log-form button {
+  align-self: flex-end;
+}
+
+.consultation-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.consultation-log-item {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.consultation-log-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.consultation-log-item p {
+  margin: 0;
+  font-size: 14px;
+  color: #1e293b;
+  white-space: pre-wrap;
+}

@@ -14,11 +14,13 @@ import Header from "./components/Header";
 import CalendarView from "./components/CalendarView";
 import DayPanel from "./components/DayPanel";
 import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
+import ConsultationView from "./components/ConsultationView";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { colorForAuthor } from "./utils/colors";
 
 function CalendarApp() {
   const { user } = useAuth();
+  const [activeView, setActiveView] = useState("calendar"); // "calendar" | "consultation"
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -52,6 +54,8 @@ function CalendarApp() {
   return (
     <div className="app">
       <Header
+        activeView={activeView}
+        onSwitchView={setActiveView}
         currentMonth={currentMonth}
         onPrevMonth={() => setCurrentMonth((m) => subMonths(m, 1))}
         onNextMonth={() => setCurrentMonth((m) => addMonths(m, 1))}
@@ -69,22 +73,28 @@ function CalendarApp() {
           onClose={() => setUploadOpen(false)}
         />
       )}
-      <main className="app-main">
-        <CalendarView
-          currentMonth={currentMonth}
-          schedules={schedules}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-        />
-        <DayPanel
-          selectedDate={selectedDate}
-          schedules={daySchedules}
-          currentUser={user}
-          onCreate={handleCreate}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-        />
-      </main>
+      {activeView === "calendar" ? (
+        <main className="app-main">
+          <CalendarView
+            currentMonth={currentMonth}
+            schedules={schedules}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
+          <DayPanel
+            selectedDate={selectedDate}
+            schedules={daySchedules}
+            currentUser={user}
+            onCreate={handleCreate}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+          />
+        </main>
+      ) : (
+        <main className="app-main app-main--single">
+          <ConsultationView user={user} />
+        </main>
+      )}
     </div>
   );
 }
