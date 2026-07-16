@@ -264,7 +264,8 @@ button {
   color: #cbd5e1;
 }
 
-.calendar-day--muted .calendar-day-event {
+.calendar-day--muted .calendar-day-chip,
+.calendar-day--muted .calendar-day-work {
   opacity: 0.55;
 }
 
@@ -292,14 +293,23 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  font-size: 10.5px;
+  line-height: 1.4;
   overflow: hidden;
   min-height: 0;
   min-width: 0;
 }
 
-.calendar-day-event {
-  font-size: 10.5px;
-  line-height: 1.5;
+@media (min-width: 900px) {
+  .calendar-day-events {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
+/* 일정(직접 등록): 색 배경 + 흰색 글자 */
+.calendar-day-chip {
+  font-weight: 600;
   color: white;
   padding: 1px 3px;
   border-radius: 3px;
@@ -310,21 +320,37 @@ button {
   max-width: 100%;
 }
 
+.calendar-day-chip-time {
+  opacity: 0.85;
+}
+
+/* 근무현황(엑셀 가져오기): 배경 없이 평일=파란색, 주말=검정색 글자, 콤마로 나열 */
+.calendar-day-work {
+  font-weight: 600;
+  overflow: hidden;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 @media (min-width: 900px) {
-  .calendar-day-event {
-    font-size: 12px;
+  .calendar-day-work {
+    -webkit-line-clamp: 5;
   }
 }
 
-.calendar-day-event-time {
-  font-weight: 600;
-  margin-right: 3px;
+.calendar-day-work--weekday {
+  color: #2563eb;
 }
 
-.calendar-day-more {
-  font-size: 11px;
-  color: #64748b;
-  padding: 0 2px;
+.calendar-day-work--weekend {
+  color: #111827;
+}
+
+.calendar-day-work-sep {
+  color: #94a3b8;
+  font-weight: 400;
 }
 
 /* Day panel */

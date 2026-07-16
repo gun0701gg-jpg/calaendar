@@ -3,6 +3,7 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  getDay,
   isSameDay,
   isSameMonth,
   isToday,
@@ -11,7 +12,6 @@ import {
 } from "date-fns";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const MAX_VISIBLE_EVENTS = 5;
 
 export default function CalendarView({ currentMonth, schedules, selectedDate, onSelectDate }) {
   const monthStart = startOfMonth(currentMonth);
@@ -46,8 +46,14 @@ export default function CalendarView({ currentMonth, schedules, selectedDate, on
           const daySchedules = schedulesByDate[dateStr] || [];
           const inMonth = isSameMonth(d, currentMonth);
           const selected = isSameDay(d, selectedDate);
-          const visible = daySchedules.slice(0, MAX_VISIBLE_EVENTS);
-          const hiddenCount = daySchedules.length - visible.length;
+          const isWeekend = [0, 6].includes(getDay(d));
+
+          // 일정(직접 등록)은 색 배경 칩으로, 근무현황(엑셀 가져오기)은 배경 없이 요일에 따른 글자색으로 구분
+          const regularEvents = daySchedules.filter((s) => !s.importBatch);
+          const workEvents = daySchedules.filter((s) => s.importBatch);
+          const workText = workEvents
+            .map((s) => `${s.time ? s.time + " " : ""}${s.title}`)
+            .join(", ");
 
           return (
             <div
@@ -69,18 +75,33 @@ export default function CalendarView({ currentMonth, schedules, selectedDate, on
             >
               <span className="calendar-day-number">{format(d, "d")}</span>
               <div className="calendar-day-events">
-                {visible.map((s) => (
+                {regularEvents.map((s) => (
                   <div
                     key={s.id}
-                    className="calendar-day-event"
+                    className="calendar-day-chip"
                     style={{ backgroundColor: s.color }}
                     title={`${s.time ? s.time + " " : ""}${s.title}`}
                   >
-                    {s.time && <span className="calendar-day-event-time">{s.time}</span>}
+                    {s.time && <span className="calendar-day-chip-time">{s.time} </span>}
                     {s.title}
                   </div>
                 ))}
-                {hiddenCount > 0 && <div className="calendar-day-more">+{hiddenCount}건 더보기</div>}
+                {workEvents.length > 0 && (
+                  <div
+                    className={
+                      "calendar-day-work " +
+                      (isWeekend ? "calendar-day-work--weekend" : "calendar-day-work--weekday")
+                    }
+                    title={workText}
+                  >
+                    {workEvents.map((s, i) => (
+                      <span key={s.id}>
+                        {s.title}
+                        {i < workEvents.length - 1 && <span className="calendar-day-work-sep">, </span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
