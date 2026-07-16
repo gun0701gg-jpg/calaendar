@@ -5,7 +5,6 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  limit,
   onSnapshot,
   orderBy,
   query,
@@ -70,28 +69,40 @@ export async function deleteSchedule(id) {
   return deleteDoc(doc(db, SCHEDULES, id));
 }
 
-// 엑셀 근무표에서 가져온 일정을 한 번에 등록. 같은 importBatch가 이미 있으면 중복 등록을 막기 위해 먼저 확인한다.
-export async function isImportBatchDone(importBatch) {
-  const q = query(collection(db, SCHEDULES), where("importBatch", "==", importBatch), limit(1));
+// 엑셀 근무표에서 가져온 일정은 importBatch로 묶어 관리한다 (예: "excel-2026-07").
+// 같은 배치가 이미 있으면 재업로드 시 기존 것을 지우고 새로 넣어 교체할 수 있게 한다.
+export async function countImportBatch(importBatch) {
+  const q = query(collection(db, SCHEDULES), where("importBatch", "==", importBatch));
   const snapshot = await getDocs(q);
-  return !snapshot.empty;
+  return snapshot.size;
+}
+
+export async function deleteImportBatch(importBatch) {
+  const q = query(collection(db, SCHEDULES), where("importBatch", "==", importBatch));
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(db);
+  snapshot.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
 }
 
 export async function bulkImportSchedules(entries, { authorUid, authorName, color, importBatch }) {
-  const batch = writeBatch(db);
-  for (const entry of entries) {
-    const ref = doc(collection(db, SCHEDULES));
-    batch.set(ref, {
-      title: entry.title,
-      date: entry.date,
-      time: null,
-      memo: "",
-      color,
-      authorUid,
-      authorName,
-      importBatch,
-      createdAt: serverTimestamp()
-    });
+  const CHUNK_SIZE = 400; // Firestore 배치 쓰기 최대 500건 제한 여유
+  for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+    const batch = writeBatch(db);
+    for (const entry of entries.slice(i, i + CHUNK_SIZE)) {
+      const ref = doc(collection(db, SCHEDULES));
+      batch.set(ref, {
+        title: entry.title,
+        date: entry.date,
+        time: null,
+        memo: "",
+        color,
+        authorUid,
+        authorName,
+        importBatch,
+        createdAt: serverTimestamp()
+      });
+    }
+    await batch.commit();
   }
-  await batch.commit();
 }

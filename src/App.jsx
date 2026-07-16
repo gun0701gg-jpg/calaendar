@@ -13,7 +13,7 @@ import Login from "./components/Login";
 import Header from "./components/Header";
 import CalendarView from "./components/CalendarView";
 import DayPanel from "./components/DayPanel";
-import ImportBanner from "./components/ImportBanner";
+import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { colorForAuthor } from "./utils/colors";
 
@@ -21,6 +21,7 @@ function CalendarApp() {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const { gridStart, gridEnd } = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -57,8 +58,16 @@ function CalendarApp() {
           setCurrentMonth(new Date());
           setSelectedDate(new Date());
         }}
+        onOpenUpload={() => setUploadOpen(true)}
       />
-      <ImportBanner monthKey={format(currentMonth, "yyyy-MM")} user={user} />
+      {uploadOpen && (
+        <WorkScheduleUploadModal
+          user={user}
+          defaultYear={currentMonth.getFullYear()}
+          defaultMonth={currentMonth.getMonth() + 1}
+          onClose={() => setUploadOpen(false)}
+        />
+      )}
       <main className="app-main">
         <CalendarView
           currentMonth={currentMonth}

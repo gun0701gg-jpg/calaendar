@@ -12,10 +12,14 @@ service cloud.firestore {
     }
 
     // 팀 일정 (1차 개발 범위)
+    // - 직접 등록한 일정(importBatch 없음)은 작성자 본인만 수정/삭제
+    // - 엑셀로 올린 근무현황(importBatch 있음)은 팀 공용 데이터라 로그인한 누구나 재업로드 시 교체 가능
     match /schedules/{scheduleId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update, delete: if isAuthor(resource.data.authorUid);
+      allow update, delete: if isSignedIn() && (
+        isAuthor(resource.data.authorUid) || resource.data.importBatch is string
+      );
     }
 
     // 메모 (향후 확장) - 일정과 동일한 소유권 규칙

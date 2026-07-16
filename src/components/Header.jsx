@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 
-export default function Header({ currentMonth, onPrevMonth, onNextMonth, onToday }) {
+export default function Header({ currentMonth, onPrevMonth, onNextMonth, onToday, onOpenUpload }) {
   const { user, logout } = useAuth();
 
   return (
@@ -19,6 +19,9 @@ export default function Header({ currentMonth, onPrevMonth, onNextMonth, onToday
         </button>
         <button className="btn btn--ghost btn--sm" onClick={onToday}>
           오늘
+        </button>
+        <button className="btn btn--primary btn--sm" onClick={onOpenUpload}>
+          근무표 올리기
         </button>
       </div>
       <div className="app-header-user">
