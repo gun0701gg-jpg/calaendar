@@ -11,6 +11,7 @@ import {
 } from "date-fns";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const MAX_VISIBLE_EVENTS = 5;
 
 export default function CalendarView({ currentMonth, schedules, selectedDate, onSelectDate }) {
   const monthStart = startOfMonth(currentMonth);
@@ -45,10 +46,14 @@ export default function CalendarView({ currentMonth, schedules, selectedDate, on
           const daySchedules = schedulesByDate[dateStr] || [];
           const inMonth = isSameMonth(d, currentMonth);
           const selected = isSameDay(d, selectedDate);
+          const visible = daySchedules.slice(0, MAX_VISIBLE_EVENTS);
+          const hiddenCount = daySchedules.length - visible.length;
 
           return (
-            <button
+            <div
               key={dateStr}
+              role="button"
+              tabIndex={0}
               className={[
                 "calendar-day",
                 !inMonth && "calendar-day--muted",
@@ -58,22 +63,26 @@ export default function CalendarView({ currentMonth, schedules, selectedDate, on
                 .filter(Boolean)
                 .join(" ")}
               onClick={() => onSelectDate(d)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onSelectDate(d);
+              }}
             >
               <span className="calendar-day-number">{format(d, "d")}</span>
-              <div className="calendar-day-dots">
-                {daySchedules.slice(0, 4).map((s) => (
-                  <span
+              <div className="calendar-day-events">
+                {visible.map((s) => (
+                  <div
                     key={s.id}
-                    className="calendar-day-dot"
+                    className="calendar-day-event"
                     style={{ backgroundColor: s.color }}
-                    title={s.title}
-                  />
+                    title={`${s.time ? s.time + " " : ""}${s.title}`}
+                  >
+                    {s.time && <span className="calendar-day-event-time">{s.time}</span>}
+                    {s.title}
+                  </div>
                 ))}
-                {daySchedules.length > 4 && (
-                  <span className="calendar-day-more">+{daySchedules.length - 4}</span>
-                )}
+                {hiddenCount > 0 && <div className="calendar-day-more">+{hiddenCount}건 더보기</div>}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
