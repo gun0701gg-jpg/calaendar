@@ -234,6 +234,7 @@ button {
 }
 
 .calendar-day {
+  min-width: 0;
   border: none;
   border-right: 1px solid #f1f5f9;
   border-bottom: 1px solid #f1f5f9;
@@ -293,6 +294,7 @@ button {
   gap: 2px;
   overflow: hidden;
   min-height: 0;
+  min-width: 0;
 }
 
 .calendar-day-event {
@@ -304,6 +306,8 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (min-width: 900px) {
