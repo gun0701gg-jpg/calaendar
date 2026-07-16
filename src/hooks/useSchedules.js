@@ -4,12 +4,15 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   updateDoc,
-  where
+  where,
+  writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -65,4 +68,30 @@ export async function updateSchedule(id, { title, date, time, memo }) {
 
 export async function deleteSchedule(id) {
   return deleteDoc(doc(db, SCHEDULES, id));
+}
+
+// 엑셀 근무표에서 가져온 일정을 한 번에 등록. 같은 importBatch가 이미 있으면 중복 등록을 막기 위해 먼저 확인한다.
+export async function isImportBatchDone(importBatch) {
+  const q = query(collection(db, SCHEDULES), where("importBatch", "==", importBatch), limit(1));
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+}
+
+export async function bulkImportSchedules(entries, { authorUid, authorName, color, importBatch }) {
+  const batch = writeBatch(db);
+  for (const entry of entries) {
+    const ref = doc(collection(db, SCHEDULES));
+    batch.set(ref, {
+      title: entry.title,
+      date: entry.date,
+      time: null,
+      memo: "",
+      color,
+      authorUid,
+      authorName,
+      importBatch,
+      createdAt: serverTimestamp()
+    });
+  }
+  await batch.commit();
 }

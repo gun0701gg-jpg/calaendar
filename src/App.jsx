@@ -13,6 +13,7 @@ import Login from "./components/Login";
 import Header from "./components/Header";
 import CalendarView from "./components/CalendarView";
 import DayPanel from "./components/DayPanel";
+import ImportBanner from "./components/ImportBanner";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { colorForAuthor } from "./utils/colors";
 
@@ -57,6 +58,7 @@ function CalendarApp() {
           setSelectedDate(new Date());
         }}
       />
+      <ImportBanner monthKey={format(currentMonth, "yyyy-MM")} user={user} />
       <main className="app-main">
         <CalendarView
           currentMonth={currentMonth}
