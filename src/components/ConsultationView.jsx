@@ -4,6 +4,7 @@ import ConsultationCard from "./ConsultationCard";
 import ConsultationForm from "./ConsultationForm";
 import ConsultationDetailModal from "./ConsultationDetailModal";
 import { STATUS_OPTIONS } from "../utils/consultationOptions";
+import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkError";
 
 export default function ConsultationView({ user }) {
   const { consultations, loading } = useConsultations();
@@ -30,6 +31,9 @@ export default function ConsultationView({ user }) {
       await exportConsultationsToExcel(consultations, logs);
     } catch (err) {
       console.error(err);
+      if (isChunkLoadError(err) && reloadForFreshVersion()) {
+        return;
+      }
       setExportError(err.message || "다운로드 중 오류가 발생했습니다.");
     } finally {
       setExporting(false);

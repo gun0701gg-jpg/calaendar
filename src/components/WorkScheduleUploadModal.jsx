@@ -2,6 +2,7 @@ import { useState } from "react";
 import { bulkImportSchedules, countImportBatch, deleteImportBatch } from "../hooks/useSchedules";
 import { DEFAULT_TARGET_NAMES, parseWorkScheduleRows } from "../utils/parseWorkSchedule";
 import { colorForAuthor } from "../utils/colors";
+import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkError";
 
 export default function WorkScheduleUploadModal({ user, defaultYear, defaultMonth, onClose }) {
   const [file, setFile] = useState(null);
@@ -68,6 +69,9 @@ export default function WorkScheduleUploadModal({ user, defaultYear, defaultMont
       setStatus("done");
       setMessage(`${entries.length}건 등록 완료되었습니다.`);
     } catch (err) {
+      if (isChunkLoadError(err) && reloadForFreshVersion()) {
+        return;
+      }
       setStatus("error");
       setMessage(err.message || "가져오는 중 오류가 발생했습니다.");
     }
