@@ -9,7 +9,8 @@ export default function Header({
   onPrevMonth,
   onNextMonth,
   onToday,
-  onOpenUpload
+  onOpenUpload,
+  onOpenAccessManage
 }) {
   const { user, logout } = useAuth();
 
@@ -57,6 +58,9 @@ export default function Header({
       <div className="app-header-user">
         {user?.photoURL && <img className="app-header-avatar" src={user.photoURL} alt="" />}
         <span className="app-header-name">{user?.displayName}</span>
+        <button className="btn btn--ghost btn--sm" onClick={onOpenAccessManage}>
+          접근 관리
+        </button>
         <button className="btn btn--ghost btn--sm" onClick={logout}>
           로그아웃
         </button>

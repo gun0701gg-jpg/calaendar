@@ -11,36 +11,52 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // config/access 문서가 없으면(아직 허용 목록을 만들지 않았으면) 기존처럼 로그인한 누구나 허용하고,
+    // 문서가 있으면 그 안의 allowedEmails 배열에 있는 이메일만 허용한다.
+    function isAllowed() {
+      return isSignedIn() && (
+        !exists(/databases/$(database)/documents/config/access) ||
+        request.auth.token.email in get(/databases/$(database)/documents/config/access).data.allowedEmails
+      );
+    }
+
+    // 허용 이메일 목록 - 로그인한 사용자는 자신이 목록에 있는지 확인하기 위해 읽을 수 있어야 하고,
+    // 목록 관리는 이미 허용된 사용자만 할 수 있다.
+    match /config/access {
+      allow read: if isSignedIn();
+      allow write: if isAllowed();
+    }
+
     // 팀 일정 (1차 개발 범위)
     // - 직접 등록한 일정(importBatch 없음)은 작성자 본인만 수정/삭제
     // - 엑셀로 올린 근무현황(importBatch 있음)은 팀 공용 데이터라 로그인한 누구나 재업로드 시 교체 가능
     match /schedules/{scheduleId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
-      allow update, delete: if isSignedIn() && (
+      allow read: if isAllowed();
+      allow create: if isAllowed() && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if isAllowed() && (
         isAuthor(resource.data.authorUid) || resource.data.importBatch is string
       );
     }
 
     // 메모 (향후 확장) - 일정과 동일한 소유권 규칙
     match /memos/{memoId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow read: if isAllowed();
+      allow create: if isAllowed() && request.resource.data.authorUid == request.auth.uid;
       allow update, delete: if isAuthor(resource.data.authorUid);
     }
 
     // 재고 관리 (향후 확장) - 팀 공용 자원이라 로그인 사용자 전체 편집 허용
     match /inventory/{itemId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isAllowed();
     }
 
     // 입소상담 - 여러 직원이 이어서 상담할 수 있도록 팀 전체가 읽고 쓸 수 있는 공용 데이터
     match /consultations/{consultationId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isAllowed();
 
       // 상담이력(로그)은 누적 기록이라 새로 남기는 것만 허용하고, 남긴 내용은 그대로 보존한다
       match /logs/{logId} {
-        allow read, create: if isSignedIn();
+        allow read, create: if isAllowed();
         allow update, delete: if false;
       }
     }

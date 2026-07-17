@@ -15,7 +15,10 @@ import CalendarView from "./components/CalendarView";
 import DayPanel from "./components/DayPanel";
 import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
 import ConsultationView from "./components/ConsultationView";
+import AccessDeniedScreen from "./components/AccessDeniedScreen";
+import AccessManageModal from "./components/AccessManageModal";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
+import { useAllowedEmails } from "./hooks/useAccessControl";
 import { colorForAuthor } from "./utils/colors";
 
 function CalendarApp() {
@@ -24,6 +27,7 @@ function CalendarApp() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [accessManageOpen, setAccessManageOpen] = useState(false);
 
   const { gridStart, gridEnd } = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -64,6 +68,7 @@ function CalendarApp() {
           setSelectedDate(new Date());
         }}
         onOpenUpload={() => setUploadOpen(true)}
+        onOpenAccessManage={() => setAccessManageOpen(true)}
       />
       {uploadOpen && (
         <WorkScheduleUploadModal
@@ -73,6 +78,7 @@ function CalendarApp() {
           onClose={() => setUploadOpen(false)}
         />
       )}
+      {accessManageOpen && <AccessManageModal user={user} onClose={() => setAccessManageOpen(false)} />}
       {activeView === "calendar" ? (
         <main className="app-main">
           <CalendarView
@@ -101,6 +107,7 @@ function CalendarApp() {
 
 function Gate() {
   const { user } = useAuth();
+  const allowedEmails = useAllowedEmails(!!user);
 
   if (user === undefined) {
     return (
@@ -110,7 +117,23 @@ function Gate() {
     );
   }
 
-  return user ? <CalendarApp /> : <Login />;
+  if (!user) {
+    return <Login />;
+  }
+
+  if (allowedEmails === undefined) {
+    return (
+      <div className="loading-screen">
+        <p>불러오는 중...</p>
+      </div>
+    );
+  }
+
+  const isAllowed =
+    allowedEmails === null ||
+    allowedEmails.map((e) => e.toLowerCase()).includes((user.email || "").toLowerCase());
+
+  return isAllowed ? <CalendarApp /> : <AccessDeniedScreen />;
 }
 
 export default function App() {
