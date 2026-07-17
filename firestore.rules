@@ -54,12 +54,14 @@ service cloud.firestore {
     // 입소상담 - 여러 직원이 이어서 상담할 수 있도록 팀 전체가 읽고 쓸 수 있는 공용 데이터
     match /consultations/{consultationId} {
       allow read, write: if isAllowed();
+    }
 
-      // 상담이력(로그)은 누적 기록이라 새로 남기는 것만 허용하고, 남긴 내용은 그대로 보존한다
-      match /logs/{logId} {
-        allow read, create: if isAllowed();
-        allow update, delete: if false;
-      }
+    // 상담이력(로그)은 누적 기록이라 새로 남기는 것만 허용하고, 남긴 내용은 그대로 보존한다.
+    // {path=**} 최상위 와일드카드로 선언해야 엑셀 다운로드가 쓰는 collectionGroup("logs") 쿼리에도 규칙이 적용된다
+    // (consultations/{id}/logs 처럼 안에 중첩해서 선언하면 개별 상담의 직접 조회에만 적용되고 전체 조회는 막힌다).
+    match /{path=**}/logs/{logId} {
+      allow read, create: if isAllowed();
+      allow update, delete: if false;
     }
 
     // 그 외 모든 문서는 기본 차단
