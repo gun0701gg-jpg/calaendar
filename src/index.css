@@ -888,6 +888,36 @@ button {
   align-self: flex-end;
 }
 
+.consultation-log-form-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.consultation-log-date-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.consultation-log-date-field input {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #1e293b;
+}
+
+.consultation-log-author {
+  font-size: 13px;
+  color: #64748b;
+}
+
 .consultation-log-list {
   list-style: none;
   margin: 0;

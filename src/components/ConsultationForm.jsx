@@ -27,7 +27,7 @@ export default function ConsultationForm({ initial, onSubmit, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!values.residentName.trim() || !values.guardianName.trim()) return;
+    // 상담 중에는 정보를 한 번에 다 알 수 없는 경우가 많아, 빈 칸이 있어도 저장할 수 있게 한다.
     setSaving(true);
     try {
       await onSubmit(values);
@@ -41,8 +41,8 @@ export default function ConsultationForm({ initial, onSubmit, onCancel }) {
       <div className="form-section-title">수급자(입소예정자) 정보</div>
       <div className="form-row">
         <label className="form-field">
-          <span>수급자 이름 *</span>
-          <input type="text" value={values.residentName} onChange={set("residentName")} required autoFocus />
+          <span>수급자 이름</span>
+          <input type="text" value={values.residentName} onChange={set("residentName")} autoFocus />
         </label>
         <label className="form-field">
           <span>생년</span>
@@ -90,8 +90,8 @@ export default function ConsultationForm({ initial, onSubmit, onCancel }) {
       <div className="form-section-title">보호자 정보</div>
       <div className="form-row">
         <label className="form-field">
-          <span>보호자 이름 *</span>
-          <input type="text" value={values.guardianName} onChange={set("guardianName")} required />
+          <span>보호자 이름</span>
+          <input type="text" value={values.guardianName} onChange={set("guardianName")} />
         </label>
         <label className="form-field">
           <span>보호자와의 관계</span>

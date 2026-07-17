@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createConsultation, useConsultations } from "../hooks/useConsultations";
+import { createConsultation, fetchAllConsultationLogs, useConsultations } from "../hooks/useConsultations";
 import ConsultationCard from "./ConsultationCard";
 import ConsultationForm from "./ConsultationForm";
 import ConsultationDetailModal from "./ConsultationDetailModal";
@@ -10,6 +10,7 @@ export default function ConsultationView({ user }) {
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("전체");
+  const [exporting, setExporting] = useState(false);
 
   const selected = consultations.find((c) => c.id === selectedId);
 
@@ -17,6 +18,17 @@ export default function ConsultationView({ user }) {
     const ref = await createConsultation(values, user);
     setCreating(false);
     setSelectedId(ref.id);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const logs = await fetchAllConsultationLogs();
+      const { exportConsultationsToExcel } = await import("../utils/exportConsultations");
+      await exportConsultationsToExcel(consultations, logs);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const visible =
@@ -43,6 +55,9 @@ export default function ConsultationView({ user }) {
             </button>
           ))}
         </div>
+        <button className="btn btn--ghost" onClick={handleExport} disabled={exporting || consultations.length === 0}>
+          {exporting ? "다운로드 중..." : "엑셀 다운로드"}
+        </button>
         <button className="btn btn--primary" onClick={() => setCreating(true)}>
           + 신규상담
         </button>

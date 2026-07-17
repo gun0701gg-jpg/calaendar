@@ -9,15 +9,21 @@ import {
 import { STATUS_COLORS } from "../utils/consultationOptions";
 import ConsultationForm from "./ConsultationForm";
 
-function formatTimestamp(ts) {
-  if (!ts?.toDate) return "";
-  return format(ts.toDate(), "yyyy.MM.dd HH:mm");
+function todayIso() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function formatIsoDate(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${y}.${m}.${d}`;
 }
 
 export default function ConsultationDetailModal({ consultation, user, onClose }) {
   const { logs } = useConsultationLogs(consultation.id);
   const [editing, setEditing] = useState(false);
   const [logContent, setLogContent] = useState("");
+  const [logDate, setLogDate] = useState(todayIso());
   const [submittingLog, setSubmittingLog] = useState(false);
 
   const statusColor = STATUS_COLORS[consultation.status] || STATUS_COLORS["상담중"];
@@ -32,15 +38,17 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
     if (!logContent.trim()) return;
     setSubmittingLog(true);
     try {
-      await addConsultationLog(consultation.id, logContent.trim(), user);
+      await addConsultationLog(consultation.id, { content: logContent.trim(), logDate }, user);
       setLogContent("");
+      setLogDate(todayIso());
     } finally {
       setSubmittingLog(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`"${consultation.residentName}" 상담 건을 삭제할까요? 상담이력도 함께 삭제됩니다.`)) return;
+    if (!window.confirm(`"${consultation.residentName || "이름 미입력"}" 상담 건을 삭제할까요? 상담이력도 함께 삭제됩니다.`))
+      return;
     await deleteConsultation(consultation.id);
     onClose();
   };
@@ -50,7 +58,7 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
       <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
         <div className="consultation-detail-header">
           <div>
-            <h2>{consultation.residentName}</h2>
+            <h2>{consultation.residentName || "이름 미입력"}</h2>
             <span
               className="consultation-card-status"
               style={{ background: statusColor.bg, color: statusColor.fg }}
@@ -85,7 +93,7 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
               <div>
                 <dt>보호자</dt>
                 <dd>
-                  {consultation.guardianName}
+                  {consultation.guardianName || "-"}
                   {consultation.guardianRelation ? ` (${consultation.guardianRelation})` : ""}
                 </dd>
               </div>
@@ -112,9 +120,16 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
         <div className="consultation-log-section">
           <h3>상담 내용 등록</h3>
           <form className="consultation-log-form" onSubmit={handleAddLog}>
+            <div className="consultation-log-form-row">
+              <label className="consultation-log-date-field">
+                <span>작성일</span>
+                <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} />
+              </label>
+              <span className="consultation-log-author">상담자: {user.displayName}</span>
+            </div>
             <textarea
               rows={3}
-              placeholder="오늘 상담한 내용을 남겨주세요. 다음에 이어받는 담당자가 이 내용을 보고 상담을 이어갈 수 있습니다."
+              placeholder="상담한 내용을 남겨주세요. 다음에 이어받는 담당자가 이 내용을 보고 상담을 이어갈 수 있습니다."
               value={logContent}
               onChange={(e) => setLogContent(e.target.value)}
             />
@@ -132,7 +147,7 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
                 <li key={log.id} className="consultation-log-item">
                   <div className="consultation-log-meta">
                     <b>{log.authorName}</b>
-                    <span>{formatTimestamp(log.createdAt)}</span>
+                    <span>{formatIsoDate(log.logDate)}</span>
                   </div>
                   <p>{log.content}</p>
                 </li>
