@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, getDay } from "date-fns";
 import ScheduleForm from "./ScheduleForm";
 
 export default function DayPanel({
   readOnly,
   selectedDate,
   schedules,
+  workSchedules = [],
   currentUser,
   onCreate,
   onUpdate,
@@ -16,6 +17,7 @@ export default function DayPanel({
 
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const editingSchedule = schedules.find((s) => s.id === editingId);
+  const isWeekend = [0, 6].includes(getDay(selectedDate));
 
   const startCreate = () => {
     setMode("create");
@@ -56,6 +58,22 @@ export default function DayPanel({
           </button>
         )}
       </div>
+
+      {workSchedules.length > 0 && (
+        <div className="day-panel-work">
+          <h3>근무현황</h3>
+          <ul className="day-panel-work-list">
+            {workSchedules.map((s) => (
+              <li
+                key={s.id}
+                className={isWeekend ? "day-panel-work-item--weekend" : "day-panel-work-item--weekday"}
+              >
+                {s.title}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {mode === "create" && (
         <ScheduleForm onSubmit={handleCreate} onCancel={cancel} />
