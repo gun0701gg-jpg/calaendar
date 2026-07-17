@@ -405,6 +405,8 @@ button {
 }
 
 /* 근무현황(엑셀 가져오기): 배경 없이 평일=파란색, 주말=검정색 글자, 콤마로 나열 */
+/* user-select: none — 휴대폰에서 길게 눌렀을 때 "캘린더에 추가" 같은 스마트 텍스트 선택 팝업이
+   뜨면서 실수로 실제 구글 캘린더에 이벤트가 생기는 걸 막기 위함 */
 .calendar-day-work {
   font-weight: 600;
   overflow: hidden;
@@ -412,6 +414,8 @@ button {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 @media (min-width: 900px) {
@@ -474,6 +478,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .day-panel-work-list li {
