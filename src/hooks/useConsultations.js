@@ -5,6 +5,7 @@ import {
   collectionGroup,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -84,6 +85,8 @@ export function useConsultationLogs(consultationId) {
 }
 
 // logDate: "yyyy-MM-dd" 형식, 상담자가 실제로 상담한 날짜 (기본값 오늘, 다른 날짜로 바꿔서 등록 가능)
+// 지난 날짜를 나중에 기록하는 경우도 있어서, 카드 미리보기용 "최근상담" 요약은
+// 방금 등록한 것이 아니라 logDate가 가장 최신인 것으로만 갱신한다.
 export async function addConsultationLog(consultationId, { content, logDate }, user) {
   await addDoc(collection(db, CONSULTATIONS, consultationId, "logs"), {
     content,
@@ -92,11 +95,19 @@ export async function addConsultationLog(consultationId, { content, logDate }, u
     authorName: user.displayName,
     createdAt: serverTimestamp()
   });
-  await updateDoc(doc(db, CONSULTATIONS, consultationId), {
-    lastLogSnippet: content.slice(0, 80),
-    lastLogAuthor: user.displayName,
-    lastLogDate: logDate,
-    updatedAt: serverTimestamp()
+
+  const consultationRef = doc(db, CONSULTATIONS, consultationId);
+  const snap = await getDoc(consultationRef);
+  const currentLastLogDate = snap.exists() ? snap.data().lastLogDate : null;
+  const isLatest = !currentLastLogDate || logDate >= currentLastLogDate;
+
+  await updateDoc(consultationRef, {
+    updatedAt: serverTimestamp(),
+    ...(isLatest && {
+      lastLogSnippet: content.slice(0, 80),
+      lastLogAuthor: user.displayName,
+      lastLogDate: logDate
+    })
   });
 }
 
