@@ -9,7 +9,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.png", "logo-symbol.png"],
       manifest: {
-        name: "위드온빌리지 캘린더",
+        name: "위드온빌리지",
         short_name: "위드온빌리지",
         description: "위드온(withon) 팀 공유 일정 관리",
         theme_color: "#2B3F6B",

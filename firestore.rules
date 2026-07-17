@@ -28,10 +28,11 @@ service cloud.firestore {
     }
 
     // 팀 일정 (1차 개발 범위)
+    // - 근무표/일정 열람은 로그인 없이도 누구나 가능 (개인정보가 없는 근무현황이라 공개)
     // - 직접 등록한 일정(importBatch 없음)은 작성자 본인만 수정/삭제
     // - 엑셀로 올린 근무현황(importBatch 있음)은 팀 공용 데이터라 로그인한 누구나 재업로드 시 교체 가능
     match /schedules/{scheduleId} {
-      allow read: if isAllowed();
+      allow read: if true;
       allow create: if isAllowed() && request.resource.data.authorUid == request.auth.uid;
       allow update, delete: if isAllowed() && (
         isAuthor(resource.data.authorUid) || resource.data.importBatch is string

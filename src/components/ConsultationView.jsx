@@ -11,6 +11,7 @@ export default function ConsultationView({ user }) {
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("전체");
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   const selected = consultations.find((c) => c.id === selectedId);
 
@@ -22,10 +23,14 @@ export default function ConsultationView({ user }) {
 
   const handleExport = async () => {
     setExporting(true);
+    setExportError("");
     try {
       const logs = await fetchAllConsultationLogs();
       const { exportConsultationsToExcel } = await import("../utils/exportConsultations");
       await exportConsultationsToExcel(consultations, logs);
+    } catch (err) {
+      console.error(err);
+      setExportError(err.message || "다운로드 중 오류가 발생했습니다.");
     } finally {
       setExporting(false);
     }
@@ -62,6 +67,8 @@ export default function ConsultationView({ user }) {
           + 신규상담
         </button>
       </div>
+
+      {exportError && <p className="modal-message modal-message--error">{exportError}</p>}
 
       {loading ? (
         <p className="schedule-empty">불러오는 중...</p>

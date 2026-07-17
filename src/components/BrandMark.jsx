@@ -8,7 +8,7 @@ export default function BrandMark({ size = "md" }) {
           <span className="brand-word-with">with</span>
           <span className="brand-word-on">on</span>
         </div>
-        <div className="brand-caption">BEYOND CARE · 위드온</div>
+        <div className="brand-caption">BEYOND CARE</div>
       </div>
     </div>
   );

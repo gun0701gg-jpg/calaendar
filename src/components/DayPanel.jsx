@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import ScheduleForm from "./ScheduleForm";
 
 export default function DayPanel({
+  readOnly,
   selectedDate,
   schedules,
   currentUser,
@@ -49,7 +50,7 @@ export default function DayPanel({
     <div className="day-panel">
       <div className="day-panel-header">
         <h2>{format(selectedDate, "M월 d일 (EEE)")}</h2>
-        {mode === "list" && (
+        {!readOnly && mode === "list" && (
           <button className="btn btn--primary" onClick={startCreate}>
             + 일정 추가
           </button>
@@ -68,7 +69,7 @@ export default function DayPanel({
         <ul className="schedule-list">
           {schedules.length === 0 && <li className="schedule-empty">등록된 일정이 없습니다.</li>}
           {schedules.map((s) => {
-            const isMine = !s.importBatch && s.authorUid === currentUser.uid;
+            const isMine = !readOnly && !s.importBatch && s.authorUid === currentUser?.uid;
             return (
               <li key={s.id} className="schedule-item" style={{ borderLeftColor: s.color }}>
                 <div className="schedule-item-main">

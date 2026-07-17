@@ -9,19 +9,17 @@ import {
   subMonths
 } from "date-fns";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import Login from "./components/Login";
 import Header from "./components/Header";
 import CalendarView from "./components/CalendarView";
 import DayPanel from "./components/DayPanel";
 import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
 import ConsultationView from "./components/ConsultationView";
-import AccessDeniedScreen from "./components/AccessDeniedScreen";
 import AccessManageModal from "./components/AccessManageModal";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { useAllowedEmails } from "./hooks/useAccessControl";
 import { colorForAuthor } from "./utils/colors";
 
-function CalendarApp() {
+function CalendarApp({ readOnly }) {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState("calendar"); // "calendar" | "consultation"
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -55,9 +53,12 @@ function CalendarApp() {
   const handleUpdate = (id, values) => updateSchedule(id, values);
   const handleDelete = (id) => deleteSchedule(id);
 
+  const showConsultation = !readOnly && activeView === "consultation";
+
   return (
     <div className="app">
       <Header
+        readOnly={readOnly}
         activeView={activeView}
         onSwitchView={setActiveView}
         currentMonth={currentMonth}
@@ -79,7 +80,11 @@ function CalendarApp() {
         />
       )}
       {accessManageOpen && <AccessManageModal user={user} onClose={() => setAccessManageOpen(false)} />}
-      {activeView === "calendar" ? (
+      {showConsultation ? (
+        <main className="app-main app-main--single">
+          <ConsultationView user={user} />
+        </main>
+      ) : (
         <main className="app-main">
           <CalendarView
             currentMonth={currentMonth}
@@ -88,6 +93,7 @@ function CalendarApp() {
             onSelectDate={setSelectedDate}
           />
           <DayPanel
+            readOnly={readOnly}
             selectedDate={selectedDate}
             schedules={daySchedules}
             currentUser={user}
@@ -95,10 +101,6 @@ function CalendarApp() {
             onUpdate={handleUpdate}
             onDelete={handleDelete}
           />
-        </main>
-      ) : (
-        <main className="app-main app-main--single">
-          <ConsultationView user={user} />
         </main>
       )}
     </div>
@@ -117,8 +119,9 @@ function Gate() {
     );
   }
 
+  // 로그인하지 않은 방문자는 근무표(캘린더)를 열람만 할 수 있다.
   if (!user) {
-    return <Login />;
+    return <CalendarApp readOnly />;
   }
 
   if (allowedEmails === undefined) {
@@ -133,7 +136,8 @@ function Gate() {
     allowedEmails === null ||
     allowedEmails.map((e) => e.toLowerCase()).includes((user.email || "").toLowerCase());
 
-  return isAllowed ? <CalendarApp /> : <AccessDeniedScreen />;
+  // 로그인은 했지만 허용 목록에 없는 사용자도 열람까지만 가능하다.
+  return <CalendarApp readOnly={!isAllowed} />;
 }
 
 export default function App() {

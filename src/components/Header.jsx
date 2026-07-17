@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import BrandMark from "./BrandMark";
 
 export default function Header({
+  readOnly,
   activeView,
   onSwitchView,
   currentMonth,
@@ -12,32 +13,34 @@ export default function Header({
   onOpenUpload,
   onOpenAccessManage
 }) {
-  const { user, logout } = useAuth();
+  const { user, login, logout } = useAuth();
 
   return (
     <header className="app-header">
       <div className="app-header-title">
         <BrandMark size="sm" />
         <span className="app-header-divider" />
-        <h1>위드온빌리지 캘린더</h1>
+        <h1>위드온빌리지</h1>
       </div>
 
-      <div className="app-header-tabs">
-        <button
-          className={`chip ${activeView === "calendar" ? "chip--active" : ""}`}
-          onClick={() => onSwitchView("calendar")}
-        >
-          캘린더
-        </button>
-        <button
-          className={`chip ${activeView === "consultation" ? "chip--active" : ""}`}
-          onClick={() => onSwitchView("consultation")}
-        >
-          입소상담
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="app-header-tabs">
+          <button
+            className={`chip ${activeView === "calendar" ? "chip--active" : ""}`}
+            onClick={() => onSwitchView("calendar")}
+          >
+            캘린더
+          </button>
+          <button
+            className={`chip ${activeView === "consultation" ? "chip--active" : ""}`}
+            onClick={() => onSwitchView("consultation")}
+          >
+            입소상담
+          </button>
+        </div>
+      )}
 
-      {activeView === "calendar" && (
+      {(readOnly || activeView === "calendar") && (
         <div className="app-header-nav">
           <button className="btn btn--ghost btn--sm" onClick={onPrevMonth}>
             ‹
@@ -49,21 +52,33 @@ export default function Header({
           <button className="btn btn--ghost btn--sm" onClick={onToday}>
             오늘
           </button>
-          <button className="btn btn--primary btn--sm" onClick={onOpenUpload}>
-            근무표 올리기
-          </button>
+          {!readOnly && (
+            <button className="btn btn--primary btn--sm" onClick={onOpenUpload}>
+              근무표 올리기
+            </button>
+          )}
         </div>
       )}
 
       <div className="app-header-user">
-        {user?.photoURL && <img className="app-header-avatar" src={user.photoURL} alt="" />}
-        <span className="app-header-name">{user?.displayName}</span>
-        <button className="btn btn--ghost btn--sm" onClick={onOpenAccessManage}>
-          접근 관리
-        </button>
-        <button className="btn btn--ghost btn--sm" onClick={logout}>
-          로그아웃
-        </button>
+        {user ? (
+          <>
+            {user.photoURL && <img className="app-header-avatar" src={user.photoURL} alt="" />}
+            <span className="app-header-name">{user.displayName}</span>
+            {!readOnly && (
+              <button className="btn btn--ghost btn--sm" onClick={onOpenAccessManage}>
+                접근 관리
+              </button>
+            )}
+            <button className="btn btn--ghost btn--sm" onClick={logout}>
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <button className="btn btn--primary btn--sm" onClick={login}>
+            Google 로그인
+          </button>
+        )}
       </div>
     </header>
   );
