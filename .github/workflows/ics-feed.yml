@@ -1,0 +1,57 @@
+name: 캘린더 ICS 피드 갱신
+
+on:
+  schedule:
+    # 3시간마다 (UTC 기준 0,3,6,...시 = KST 9,12,15,... 시)
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  update-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: Firebase 서비스 계정 키 파일 생성
+        run: echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/service-account.json"
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: 일정을 ICS 파일로 변환
+        run: node scripts/generate-ics-feed.mjs
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/service-account.json
+
+      - name: 빌드용 환경변수 파일 생성
+        run: |
+          cat <<EOF > .env
+          VITE_FIREBASE_API_KEY_PART1=${{ secrets.VITE_FIREBASE_API_KEY_PART1 }}
+          VITE_FIREBASE_API_KEY_PART2=${{ secrets.VITE_FIREBASE_API_KEY_PART2 }}
+          VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID=${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          EOF
+
+      - name: 앱 빌드 (ICS 파일 포함)
+        run: npm run build
+
+      - name: Firebase Hosting 배포
+        run: npx firebase-tools@13 deploy --only hosting --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/service-account.json
+
+      - name: 서비스 계정 키 파일 삭제
+        if: always()
+        run: rm -f "$RUNNER_TEMP/service-account.json"

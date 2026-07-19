@@ -15,6 +15,7 @@ import DayPanel from "./components/DayPanel";
 import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
 import ConsultationView from "./components/ConsultationView";
 import AccessManageModal from "./components/AccessManageModal";
+import GoogleCalendarSyncModal from "./components/GoogleCalendarSyncModal";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { useAllowedEmails } from "./hooks/useAccessControl";
 import { colorForAuthor } from "./utils/colors";
@@ -26,6 +27,7 @@ function CalendarApp({ readOnly }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uploadOpen, setUploadOpen] = useState(false);
   const [accessManageOpen, setAccessManageOpen] = useState(false);
+  const [googleSyncOpen, setGoogleSyncOpen] = useState(false);
 
   const { gridStart, gridEnd } = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -73,7 +75,9 @@ function CalendarApp({ readOnly }) {
         }}
         onOpenUpload={() => setUploadOpen(true)}
         onOpenAccessManage={() => setAccessManageOpen(true)}
+        onOpenGoogleSync={() => setGoogleSyncOpen(true)}
       />
+      {googleSyncOpen && <GoogleCalendarSyncModal onClose={() => setGoogleSyncOpen(false)} />}
       {uploadOpen && (
         <WorkScheduleUploadModal
           user={user}

@@ -11,7 +11,8 @@ export default function Header({
   onNextMonth,
   onToday,
   onOpenUpload,
-  onOpenAccessManage
+  onOpenAccessManage,
+  onOpenGoogleSync
 }) {
   const { user, login, logout } = useAuth();
 
@@ -51,6 +52,9 @@ export default function Header({
           </button>
           <button className="btn btn--ghost btn--sm" onClick={onToday}>
             오늘
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={onOpenGoogleSync}>
+            구글 캘린더 연동
           </button>
           {!readOnly && (
             <button className="btn btn--primary btn--sm" onClick={onOpenUpload}>
