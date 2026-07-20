@@ -758,7 +758,8 @@ button {
   background: #f1f5f9;
 }
 
-.chip--active {
+.chip--active,
+.chip--active:hover {
   background: #16233f;
   border-color: #16233f;
   color: white;
