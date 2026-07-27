@@ -104,7 +104,6 @@ function CalendarApp({ readOnly }) {
             selectedDate={selectedDate}
             schedules={daySchedules}
             workSchedules={dayWorkSchedules}
-            currentUser={user}
             onCreate={handleCreate}
             onUpdate={handleUpdate}
             onDelete={handleDelete}

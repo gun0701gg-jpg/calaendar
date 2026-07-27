@@ -7,7 +7,6 @@ export default function DayPanel({
   selectedDate,
   schedules,
   workSchedules = [],
-  currentUser,
   onCreate,
   onUpdate,
   onDelete
@@ -87,7 +86,7 @@ export default function DayPanel({
         <ul className="schedule-list">
           {schedules.length === 0 && <li className="schedule-empty">등록된 일정이 없습니다.</li>}
           {schedules.map((s) => {
-            const isMine = !readOnly && !s.importBatch && s.authorUid === currentUser?.uid;
+            const canEdit = !readOnly && !s.importBatch;
             return (
               <li key={s.id} className="schedule-item" style={{ borderLeftColor: s.color }}>
                 <div className="schedule-item-main">
@@ -100,7 +99,7 @@ export default function DayPanel({
                   </span>
                   {s.memo && <p className="schedule-item-memo">{s.memo}</p>}
                 </div>
-                {isMine && (
+                {canEdit && (
                   <div className="schedule-item-actions">
                     <button className="btn btn--ghost btn--sm" onClick={() => startEdit(s.id)}>
                       수정
