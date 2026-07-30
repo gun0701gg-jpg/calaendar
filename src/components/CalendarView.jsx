@@ -10,6 +10,7 @@ import {
   startOfMonth,
   startOfWeek
 } from "date-fns";
+import { colorForSchedule } from "../utils/colors";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -82,7 +83,7 @@ export default function CalendarView({ currentMonth, schedules, selectedDate, on
                   <div
                     key={s.id}
                     className="calendar-day-chip"
-                    style={{ backgroundColor: s.color }}
+                    style={{ backgroundColor: colorForSchedule(s) }}
                     title={`${s.time ? s.time + " " : ""}${s.title}`}
                   >
                     {s.time && <span className="calendar-day-chip-time">{s.time} </span>}

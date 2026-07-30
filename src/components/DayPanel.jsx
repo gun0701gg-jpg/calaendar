@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { format, getDay } from "date-fns";
 import ScheduleForm from "./ScheduleForm";
+import { colorForSchedule } from "../utils/colors";
 
 export default function DayPanel({
   readOnly,
@@ -87,14 +88,15 @@ export default function DayPanel({
           {schedules.length === 0 && <li className="schedule-empty">등록된 일정이 없습니다.</li>}
           {schedules.map((s) => {
             const canEdit = !readOnly && !s.importBatch;
+            const color = colorForSchedule(s);
             return (
-              <li key={s.id} className="schedule-item" style={{ borderLeftColor: s.color }}>
+              <li key={s.id} className="schedule-item" style={{ borderLeftColor: color }}>
                 <div className="schedule-item-main">
                   {s.time && <span className="schedule-item-time">{s.time}</span>}
                   <span className="schedule-item-title">{s.title}</span>
                 </div>
                 <div className="schedule-item-meta">
-                  <span className="schedule-item-author" style={{ color: s.color }}>
+                  <span className="schedule-item-author" style={{ color }}>
                     {s.authorName}
                   </span>
                   {s.memo && <p className="schedule-item-memo">{s.memo}</p>}

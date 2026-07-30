@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { bulkImportSchedules, countImportBatch, deleteImportBatch } from "../hooks/useSchedules";
 import { DEFAULT_TARGET_NAMES, parseWorkScheduleRows } from "../utils/parseWorkSchedule";
-import { colorForAuthor } from "../utils/colors";
 import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkError";
 
 export default function WorkScheduleUploadModal({ user, defaultYear, defaultMonth, onClose }) {
@@ -62,7 +61,6 @@ export default function WorkScheduleUploadModal({ user, defaultYear, defaultMont
       await bulkImportSchedules(entries, {
         authorUid: user.uid,
         authorName: user.displayName,
-        color: colorForAuthor(user.uid),
         importBatch
       });
 

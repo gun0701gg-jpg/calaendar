@@ -1,11 +1,9 @@
 import { useState } from "react";
+import { VISIT_MEMO_PATTERN } from "../utils/colors";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
 const FLOORS = ["3", "4", "5", "6"];
-
-// 기존에 "면회" 형식(시간 (이름/층수층))으로 저장된 메모를 수정할 때 각 항목을 다시 나눠 보여주기 위한 패턴
-const VISIT_MEMO_PATTERN = /^(\d{2}):(\d{2}) \((.*)\/(\d)층\)$/;
 
 export default function ScheduleForm({ initial, onSubmit, onCancel }) {
   const [title, setTitle] = useState(initial?.title || "");

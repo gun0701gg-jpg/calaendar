@@ -43,13 +43,12 @@ export function useSchedules(monthStart, monthEnd) {
   return { schedules, loading };
 }
 
-export async function createSchedule({ title, date, time, memo, color, authorUid, authorName }) {
+export async function createSchedule({ title, date, time, memo, authorUid, authorName }) {
   return addDoc(collection(db, SCHEDULES), {
     title,
     date,
     time: time || null,
     memo: memo || "",
-    color,
     authorUid,
     authorName,
     createdAt: serverTimestamp()
@@ -85,7 +84,7 @@ export async function deleteImportBatch(importBatch) {
   await batch.commit();
 }
 
-export async function bulkImportSchedules(entries, { authorUid, authorName, color, importBatch }) {
+export async function bulkImportSchedules(entries, { authorUid, authorName, importBatch }) {
   const CHUNK_SIZE = 400; // Firestore 배치 쓰기 최대 500건 제한 여유
   for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
     const batch = writeBatch(db);
@@ -96,7 +95,6 @@ export async function bulkImportSchedules(entries, { authorUid, authorName, colo
         date: entry.date,
         time: null,
         memo: "",
-        color,
         authorUid,
         authorName,
         importBatch,
