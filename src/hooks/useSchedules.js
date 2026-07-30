@@ -43,24 +43,26 @@ export function useSchedules(monthStart, monthEnd) {
   return { schedules, loading };
 }
 
-export async function createSchedule({ title, date, time, memo, authorUid, authorName }) {
+export async function createSchedule({ title, date, time, memo, category, authorUid, authorName }) {
   return addDoc(collection(db, SCHEDULES), {
     title,
     date,
     time: time || null,
     memo: memo || "",
+    category: category || null,
     authorUid,
     authorName,
     createdAt: serverTimestamp()
   });
 }
 
-export async function updateSchedule(id, { title, date, time, memo }) {
+export async function updateSchedule(id, { title, date, time, memo, category }) {
   return updateDoc(doc(db, SCHEDULES, id), {
     title,
     date,
     time: time || null,
-    memo: memo || ""
+    memo: memo || "",
+    category: category || null
   });
 }
 
