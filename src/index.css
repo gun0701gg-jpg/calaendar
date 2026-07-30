@@ -532,6 +532,10 @@ button {
   font-weight: 500;
 }
 
+.schedule-item-title {
+  white-space: pre-wrap;
+}
+
 .schedule-item-meta {
   margin-top: 4px;
   display: flex;

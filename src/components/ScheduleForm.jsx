@@ -30,11 +30,11 @@ export default function ScheduleForm({ initial, onSubmit, onCancel }) {
     <form className="schedule-form" onSubmit={handleSubmit}>
       <label className="form-field">
         <span>제목</span>
-        <input
-          type="text"
+        <textarea
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="일정 제목"
+          rows={2}
           autoFocus
           required
         />
