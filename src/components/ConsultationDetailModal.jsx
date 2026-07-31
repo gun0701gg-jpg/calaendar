@@ -4,6 +4,7 @@ import {
   addConsultationLog,
   deleteConsultation,
   updateConsultation,
+  updateConsultationLog,
   useConsultationLogs
 } from "../hooks/useConsultations";
 import { STATUS_COLORS } from "../utils/consultationOptions";
@@ -25,6 +26,10 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
   const [logContent, setLogContent] = useState("");
   const [logDate, setLogDate] = useState(todayIso());
   const [submittingLog, setSubmittingLog] = useState(false);
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editLogContent, setEditLogContent] = useState("");
+  const [editLogDate, setEditLogDate] = useState("");
+  const [savingLogEdit, setSavingLogEdit] = useState(false);
 
   const statusColor = STATUS_COLORS[consultation.status] || STATUS_COLORS["상담중"];
 
@@ -43,6 +48,31 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
       setLogDate(todayIso());
     } finally {
       setSubmittingLog(false);
+    }
+  };
+
+  const startEditLog = (log) => {
+    setEditingLogId(log.id);
+    setEditLogContent(log.content);
+    setEditLogDate(log.logDate);
+  };
+
+  const cancelEditLog = () => {
+    setEditingLogId(null);
+  };
+
+  const handleSaveLogEdit = async (e) => {
+    e.preventDefault();
+    if (!editLogContent.trim()) return;
+    setSavingLogEdit(true);
+    try {
+      await updateConsultationLog(consultation.id, editingLogId, {
+        content: editLogContent.trim(),
+        logDate: editLogDate
+      });
+      setEditingLogId(null);
+    } finally {
+      setSavingLogEdit(false);
     }
   };
 
@@ -143,15 +173,57 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
             <p className="schedule-empty">아직 등록된 상담 이력이 없습니다.</p>
           ) : (
             <ul className="consultation-log-list">
-              {[...logs].reverse().map((log) => (
-                <li key={log.id} className="consultation-log-item">
-                  <div className="consultation-log-meta">
-                    <b>{log.authorName}</b>
-                    <span>{formatIsoDate(log.logDate)}</span>
-                  </div>
-                  <p>{log.content}</p>
-                </li>
-              ))}
+              {[...logs].reverse().map((log) =>
+                editingLogId === log.id ? (
+                  <li key={log.id} className="consultation-log-item">
+                    <form className="consultation-log-form" onSubmit={handleSaveLogEdit}>
+                      <div className="consultation-log-form-row">
+                        <label className="consultation-log-date-field">
+                          <span>작성일</span>
+                          <input
+                            type="date"
+                            value={editLogDate}
+                            onChange={(e) => setEditLogDate(e.target.value)}
+                          />
+                        </label>
+                        <span className="consultation-log-author">상담자: {log.authorName}</span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={editLogContent}
+                        onChange={(e) => setEditLogContent(e.target.value)}
+                      />
+                      <div className="form-actions">
+                        <button type="button" className="btn btn--ghost btn--sm" onClick={cancelEditLog}>
+                          취소
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn btn--primary btn--sm"
+                          disabled={savingLogEdit}
+                        >
+                          {savingLogEdit ? "저장 중..." : "저장"}
+                        </button>
+                      </div>
+                    </form>
+                  </li>
+                ) : (
+                  <li key={log.id} className="consultation-log-item">
+                    <div className="consultation-log-meta">
+                      <b>{log.authorName}</b>
+                      <span>{formatIsoDate(log.logDate)}</span>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm consultation-log-edit-btn"
+                        onClick={() => startEditLog(log)}
+                      >
+                        수정
+                      </button>
+                    </div>
+                    <p>{log.content}</p>
+                  </li>
+                )
+              )}
             </ul>
           )}
         </div>

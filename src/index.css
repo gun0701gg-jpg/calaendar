@@ -1059,6 +1059,10 @@ button {
   margin-bottom: 4px;
 }
 
+.consultation-log-edit-btn {
+  margin-left: auto;
+}
+
 .consultation-log-item p {
   margin: 0;
   font-size: 14px;

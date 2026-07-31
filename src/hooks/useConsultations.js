@@ -111,6 +111,31 @@ export async function addConsultationLog(consultationId, { content, logDate }, u
   });
 }
 
+// 상담이력은 여러 직원이 이어서 남기다 보니 오탈자/보완이 필요할 때가 있어 팀원 누구나 내용을 고칠 수 있다.
+// 수정한 이력이 카드 미리보기(최근상담)에 쓰인 것일 수 있어, 저장 후 전체를 다시 봐서 미리보기를 갱신한다.
+export async function updateConsultationLog(consultationId, logId, { content, logDate }) {
+  await updateDoc(doc(db, CONSULTATIONS, consultationId, "logs", logId), {
+    content,
+    logDate
+  });
+
+  const q = query(
+    collection(db, CONSULTATIONS, consultationId, "logs"),
+    orderBy("logDate", "asc"),
+    orderBy("createdAt", "asc")
+  );
+  const snapshot = await getDocs(q);
+  const latest = snapshot.docs[snapshot.docs.length - 1];
+  const latestData = latest?.data();
+
+  await updateDoc(doc(db, CONSULTATIONS, consultationId), {
+    updatedAt: serverTimestamp(),
+    lastLogSnippet: latestData ? latestData.content.slice(0, 80) : "",
+    lastLogAuthor: latestData ? latestData.authorName : "",
+    lastLogDate: latestData ? latestData.logDate : null
+  });
+}
+
 // 엑셀 다운로드용: 모든 상담 건의 상담이력을 한 번에 가져온다 (collectionGroup 쿼리)
 export async function fetchAllConsultationLogs() {
   const q = query(collectionGroup(db, "logs"), orderBy("logDate", "asc"), orderBy("createdAt", "asc"));
