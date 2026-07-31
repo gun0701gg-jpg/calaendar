@@ -18,6 +18,19 @@ export default function ScheduleForm({ initial, onSubmit, onCancel }) {
   const [minute, setMinute] = useState(initial?.time ? initial.time.split(":")[1] : "00");
   const [memo, setMemo] = useState(initialCategory === "visit" ? "" : initial?.memo || "");
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const shareText = `${hour}:${minute} 면회(${name.trim() || "이름"}/${floor}층)`;
+
+  const handleCopyShareText = async () => {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("아래 문구를 직접 복사해주세요.", shareText);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -127,16 +140,27 @@ export default function ScheduleForm({ initial, onSubmit, onCancel }) {
       </div>
 
       {category === "visit" ? (
-        <label className="form-field">
-          <span>층수</span>
-          <select value={floor} onChange={(e) => setFloor(e.target.value)}>
-            {FLOORS.map((f) => (
-              <option key={f} value={f}>
-                {f}층
-              </option>
-            ))}
-          </select>
-        </label>
+        <>
+          <label className="form-field">
+            <span>층수</span>
+            <select value={floor} onChange={(e) => setFloor(e.target.value)}>
+              {FLOORS.map((f) => (
+                <option key={f} value={f}>
+                  {f}층
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="form-field">
+            <span>공유 문구</span>
+            <div className="visit-share-row">
+              <input type="text" value={shareText} readOnly onFocus={(e) => e.target.select()} />
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleCopyShareText}>
+                {copied ? "복사됨" : "복사"}
+              </button>
+            </div>
+          </div>
+        </>
       ) : (
         <label className="form-field">
           <span>메모 (선택)</span>

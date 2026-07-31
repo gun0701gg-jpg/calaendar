@@ -625,15 +625,15 @@ button {
   gap: 16px;
 }
 
-.visit-info-row {
+.visit-share-row {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
 }
 
-.visit-info-row select,
-.visit-info-row input {
+.visit-share-row input {
+  flex: 1;
+  min-width: 0;
   font-family: inherit;
   font-size: 14px;
   padding: 8px 10px;
@@ -641,12 +641,7 @@ button {
   border-radius: 8px;
   font-weight: 400;
   color: #1e293b;
-  background: white;
-}
-
-.visit-info-row input {
-  flex: 1;
-  min-width: 80px;
+  background: #f8fafc;
 }
 
 .form-actions {
