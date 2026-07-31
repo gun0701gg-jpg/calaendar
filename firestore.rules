@@ -53,12 +53,12 @@ service cloud.firestore {
       allow read, write: if isAllowed();
     }
 
-    // 상담이력(로그)은 여러 직원이 이어서 남기는 공용 기록이라, 팀원 누구나 내용을 고칠 수 있다 (삭제는 계속 금지).
+    // 상담이력(로그)은 여러 직원이 이어서 남기는 공용 기록이라, 팀원 누구나 내용을 고치거나 지울 수 있다.
+    // (상담 건 전체를 삭제할 때 그 안의 로그들도 함께 지워야 해서 delete도 허용해야 한다.)
     // {path=**} 최상위 와일드카드로 선언해야 엑셀 다운로드가 쓰는 collectionGroup("logs") 쿼리에도 규칙이 적용된다
     // (consultations/{id}/logs 처럼 안에 중첩해서 선언하면 개별 상담의 직접 조회에만 적용되고 전체 조회는 막힌다).
     match /{path=**}/logs/{logId} {
-      allow read, create, update: if isAllowed();
-      allow delete: if false;
+      allow read, create, update, delete: if isAllowed();
     }
 
     // 그 외 모든 문서는 기본 차단

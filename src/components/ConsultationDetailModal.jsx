@@ -30,6 +30,7 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
   const [editLogContent, setEditLogContent] = useState("");
   const [editLogDate, setEditLogDate] = useState("");
   const [savingLogEdit, setSavingLogEdit] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const statusColor = STATUS_COLORS[consultation.status] || STATUS_COLORS["상담중"];
 
@@ -79,8 +80,13 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
   const handleDelete = async () => {
     if (!window.confirm(`"${consultation.residentName || "이름 미입력"}" 상담 건을 삭제할까요? 상담이력도 함께 삭제됩니다.`))
       return;
-    await deleteConsultation(consultation.id);
-    onClose();
+    setDeleteError("");
+    try {
+      await deleteConsultation(consultation.id);
+      onClose();
+    } catch (err) {
+      setDeleteError(err.message || "삭제 중 오류가 발생했습니다.");
+    }
   };
 
   return (
@@ -136,6 +142,7 @@ export default function ConsultationDetailModal({ consultation, user, onClose })
                 <dd>{consultation.region || "-"}</dd>
               </div>
             </dl>
+            {deleteError && <p className="modal-message modal-message--error">{deleteError}</p>}
             <div className="form-actions">
               <button className="btn btn--ghost btn--sm btn--danger" onClick={handleDelete}>
                 상담 삭제
