@@ -2,8 +2,8 @@
 export const VISIT_TITLE_PATTERN = /^면회\((.*)\/(\d)층\)$/;
 
 const CATEGORY_COLORS = {
-  schedule: "#3b82f6", // 일정 (a색)
-  highlight: "#a855f7", // 면회 / 입소상담 (b색)
+  schedule: "#16a34a", // 일정 (a색)
+  highlight: "#f97316", // 면회 / 입소상담 (b색)
   work: "#64748b" // 근무현황
 };
 
