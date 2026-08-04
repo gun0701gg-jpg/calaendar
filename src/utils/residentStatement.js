@@ -1,7 +1,7 @@
 // 수급자별 "장기요양급여비용 명세서" 엑셀 생성.
-// 국민건강보험공단 등에서 매달 다운로드하는, 수급자 한 명당 시트 하나씩 있는 원본 엑셀을 업로드하면
-// 그 안의 금액을 읽어서 위드온빌리지 자체 명세서 양식(노인장기요양보험법 시행규칙 별지 제24호서식을
-// 기관 양식으로 재구성한 것)으로 다시 만들어준다.
+// 국민건강보험공단 등에서 매달 다운로드하는 "청구명세 리스트"(시트 하나에 수급자별 한 줄씩,
+// 수급자명·공단부담금·본인부담금 열이 있는 표)를 업로드하면, 위드온빌리지 자체 명세서 양식
+// (노인장기요양보험법 시행규칙 별지 제24호서식을 기관 양식으로 재구성한 것)으로 다시 만들어준다.
 const ORG = {
   code: "1-11530-00453",
   name: "위드온빌리지",
@@ -44,62 +44,54 @@ const formula = (f, extra = {}) => ({
   ...extra
 });
 
-// 원본 파일(시트 1개 = 수급자 1명)에서 값이 들어있는 고정 셀 위치.
-// [row, col] — 1행/1열부터 시작하는 엑셀 좌표.
-const SOURCE_CELLS = {
-  name: [8, 1], // A8
-  careNumber: [8, 3], // C8
-  period: [8, 6], // F8 (예: "2026.08.01~2026.08.31" — 이미 보기 좋은 형식이라 그대로 사용)
-  selfPay: [10, 6], // F10 본인부담금①
-  insurancePay: [11, 6], // F11 공단부담금②
-  mealCost: [14, 6], // F14 식사재료비④
-  roomUpgradeCost: [15, 6], // F15 추가비용⑤
-  groomingCost: [17, 6], // F17 이미용비⑥
-  otherCosts: [
-    [19, 6],
-    [21, 6],
-    [23, 6],
-    [25, 6],
-    [27, 6]
-  ] // F19,F21,F23,F25,F27 기타⑦ 개별 항목 (최대 5건)
-};
-
-function cellAt(rows, [row, col]) {
-  return rows[row - 1]?.[col - 1];
-}
-
 function toNumber(v) {
   return typeof v === "number" ? v : Number(v) || 0;
 }
 
-// 업로드한 워크북의 시트마다 수급자 한 명의 데이터를 뽑아낸다. 성명이 없는 시트(안내/빈 시트 등)는 건너뛴다.
+// "청구명세 리스트" 표에서 필요한 열을 찾는다. 열 이름으로 찾아서, 리스트 앞뒤에 제목 줄이
+// 몇 줄 더 있거나 열 순서가 바뀌어도 안정적으로 읽을 수 있게 한다.
+const REQUIRED_COLUMNS = {
+  name: "수급자명",
+  insurancePay: "공단부담금",
+  selfPay: "본인부담금"
+};
+
+// 업로드한 표에서 "수급자명" 열이 있는 줄을 헤더로 보고, 그 아래 각 줄을 수급자 한 명으로 읽는다.
 export async function parseResidentStatementFile(file) {
   const readXlsxFile = (await import("read-excel-file/browser")).default;
   const sheets = await readXlsxFile(file);
+  const data = sheets[0]?.data || [];
+
+  const headerRowIndex = data.findIndex((row) => row.includes(REQUIRED_COLUMNS.name));
+  if (headerRowIndex === -1) {
+    return { residents: [], skipped: [] };
+  }
+
+  const headers = data[headerRowIndex];
+  const columnIndex = Object.fromEntries(
+    Object.entries(REQUIRED_COLUMNS).map(([key, header]) => [key, headers.indexOf(header)])
+  );
 
   const residents = [];
-  const skipped = [];
+  for (let i = headerRowIndex + 1; i < data.length; i++) {
+    const row = data[i];
+    const name = row[columnIndex.name];
+    if (!name || typeof name !== "string") continue;
 
-  for (const { sheet, data } of sheets) {
-    const name = cellAt(data, SOURCE_CELLS.name);
-    if (!name || typeof name !== "string") {
-      skipped.push(sheet);
-      continue;
-    }
     residents.push({
       name: name.trim(),
-      careNumber: cellAt(data, SOURCE_CELLS.careNumber) || "",
-      period: cellAt(data, SOURCE_CELLS.period) || "",
-      selfPay: toNumber(cellAt(data, SOURCE_CELLS.selfPay)),
-      insurancePay: toNumber(cellAt(data, SOURCE_CELLS.insurancePay)),
-      mealCost: toNumber(cellAt(data, SOURCE_CELLS.mealCost)),
-      roomUpgradeCost: toNumber(cellAt(data, SOURCE_CELLS.roomUpgradeCost)),
-      groomingCost: toNumber(cellAt(data, SOURCE_CELLS.groomingCost)),
-      otherCosts: SOURCE_CELLS.otherCosts.map((pos) => toNumber(cellAt(data, pos)))
+      careNumber: "",
+      period: "",
+      selfPay: toNumber(row[columnIndex.selfPay]),
+      insurancePay: toNumber(row[columnIndex.insurancePay]),
+      mealCost: 0,
+      roomUpgradeCost: 0,
+      groomingCost: 0,
+      otherCosts: [0, 0, 0, 0, 0]
     });
   }
 
-  return { residents, skipped };
+  return { residents, skipped: [] };
 }
 
 function statusMark(resident, target) {
@@ -110,14 +102,26 @@ function receiptNumber(billingMonth, seq) {
   return `${ORG.name}-${billingMonth}-${String(seq).padStart(3, "0")}`;
 }
 
-function issueDateText(billingMonth) {
+function lastDayOf(billingMonth) {
   const [y, m] = billingMonth.split("-").map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  return `${y}년  ${m}월  ${lastDay}일`;
+  return new Date(y, m, 0).getDate();
+}
+
+function issueDateText(billingMonth) {
+  const [y, m] = billingMonth.split("-");
+  return `${y}년  ${Number(m)}월  ${lastDayOf(billingMonth)}일`;
+}
+
+// 리스트 형식 업로드에는 급여제공기간이 없어서, 급여년월 한 달 전체로 기본값을 만든다.
+function defaultPeriodText(billingMonth) {
+  const [y, m] = billingMonth.split("-");
+  const last = String(lastDayOf(billingMonth)).padStart(2, "0");
+  return `${y}.${m}.01~${y}.${m}.${last}`;
 }
 
 function buildResidentSheetData(resident, seq, billingMonth) {
   const receiptNo = receiptNumber(billingMonth, seq);
+  const periodText = resident.period || defaultPeriodText(billingMonth);
 
   return [
     [
@@ -133,7 +137,7 @@ function buildResidentSheetData(resident, seq, billingMonth) {
     [label("주소"), text(ORG.address, { columnSpan: 3 }), null, null, label("사업자등록번호"), text(ORG.businessNumber, { columnSpan: 3 }), null, null],
 
     [label("성명"), label("장기요양인정번호", { columnSpan: 2 }), null, label("급여제공기간"), label("영수증 번호", { columnSpan: 4 }), null, null, null],
-    [text(resident.name), text(resident.careNumber, { columnSpan: 2 }), null, text(resident.period), text(receiptNo, { columnSpan: 4 }), null, null, null],
+    [text(resident.name), text(resident.careNumber, { columnSpan: 2 }), null, text(periodText), text(receiptNo, { columnSpan: 4 }), null, null, null],
 
     [label("항목", { columnSpan: 3 }), null, null, label("금액"), label("금액산정내역", { columnSpan: 4 }), null, null, null],
 
