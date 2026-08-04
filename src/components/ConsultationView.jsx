@@ -3,6 +3,7 @@ import { createConsultation, fetchAllConsultationLogs, useConsultations } from "
 import ConsultationCard from "./ConsultationCard";
 import ConsultationForm from "./ConsultationForm";
 import ConsultationDetailModal from "./ConsultationDetailModal";
+import ResidentStatementModal from "./ResidentStatementModal";
 import { STATUS_OPTIONS } from "../utils/consultationOptions";
 import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkError";
 
@@ -13,6 +14,7 @@ export default function ConsultationView({ user }) {
   const [statusFilter, setStatusFilter] = useState("전체");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [statementOpen, setStatementOpen] = useState(false);
 
   const selected = consultations.find((c) => c.id === selectedId);
 
@@ -67,6 +69,9 @@ export default function ConsultationView({ user }) {
         <button className="btn btn--ghost" onClick={handleExport} disabled={exporting || consultations.length === 0}>
           {exporting ? "다운로드 중..." : "엑셀 다운로드"}
         </button>
+        <button className="btn btn--ghost" onClick={() => setStatementOpen(true)}>
+          수급자 명세서 작성
+        </button>
         <button className="btn btn--primary" onClick={() => setCreating(true)}>
           + 신규상담
         </button>
@@ -98,6 +103,8 @@ export default function ConsultationView({ user }) {
       {selected && (
         <ConsultationDetailModal consultation={selected} user={user} onClose={() => setSelectedId(null)} />
       )}
+
+      {statementOpen && <ResidentStatementModal onClose={() => setStatementOpen(false)} />}
     </div>
   );
 }
