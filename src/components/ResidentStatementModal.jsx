@@ -1,10 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import {
-  downloadResidentStatementTemplate,
-  downloadResidentStatements,
-  parseResidentStatementFile
-} from "../utils/residentStatement";
+import { downloadResidentStatements, parseResidentStatementFile } from "../utils/residentStatement";
 import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkError";
 
 export default function ResidentStatementModal({ onClose }) {
@@ -12,15 +8,6 @@ export default function ResidentStatementModal({ onClose }) {
   const [billingMonth, setBillingMonth] = useState(format(new Date(), "yyyy-MM"));
   const [status, setStatus] = useState("idle"); // idle | working | done | error
   const [message, setMessage] = useState("");
-
-  const handleDownloadTemplate = async () => {
-    try {
-      await downloadResidentStatementTemplate();
-    } catch (err) {
-      if (isChunkLoadError(err) && reloadForFreshVersion()) return;
-      window.alert(err.message || "양식 다운로드 중 오류가 발생했습니다.");
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,29 +19,22 @@ export default function ResidentStatementModal({ onClose }) {
     setMessage("파일을 읽는 중...");
 
     try {
-      const { objects, errors } = await parseResidentStatementFile(file);
+      const { residents, skipped } = await parseResidentStatementFile(file);
 
-      if (errors) {
+      if (residents.length === 0) {
         setStatus("error");
-        setMessage(
-          errors
-            .map((e) => `${e.row}행 "${e.column}": ${e.error === "required" ? "값이 비어있습니다" : e.error}`)
-            .join("\n")
-        );
+        setMessage("업로드한 파일에서 수급자 데이터를 찾지 못했습니다. 성명이 들어있는 시트가 있는지 확인해주세요.");
         return;
       }
 
-      if (!objects || objects.length === 0) {
-        setStatus("error");
-        setMessage("업로드한 파일에서 수급자 데이터를 찾지 못했습니다.");
-        return;
-      }
-
-      setMessage(`${objects.length}명 명세서 생성 중...`);
-      await downloadResidentStatements(objects, billingMonth);
+      setMessage(`${residents.length}명 명세서 생성 중...`);
+      await downloadResidentStatements(residents, billingMonth);
 
       setStatus("done");
-      setMessage(`${objects.length}명 명세서를 생성했습니다.`);
+      setMessage(
+        `${residents.length}명 명세서를 생성했습니다.` +
+          (skipped.length > 0 ? ` (건너뛴 시트: ${skipped.join(", ")})` : "")
+      );
     } catch (err) {
       if (isChunkLoadError(err) && reloadForFreshVersion()) return;
       setStatus("error");
@@ -67,13 +47,11 @@ export default function ResidentStatementModal({ onClose }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>수급자 명세서 작성</h2>
         <p className="modal-hint">
-          매달 수급자별 데이터를 정해진 양식의 엑셀로 업로드하면, 수급자 한 명당 시트 하나씩 담긴
-          장기요양급여비용 명세서 파일을 만들어드립니다.
+          국민건강보험공단 등에서 다운로드한, 수급자 한 명당 시트 하나씩 있는 원본 엑셀을 업로드하면
+          그 안의 금액을 읽어서 위드온빌리지 자체 양식의 장기요양급여비용 명세서 파일로 다시
+          만들어드립니다. 카드결제·현금영수증·현금·이미납부한금액·비고 항목은 원본에 없어서 빈 칸으로
+          만들어지니, 필요하면 만들어진 파일에서 직접 채워주세요.
         </p>
-
-        <button type="button" className="btn btn--ghost btn--sm" onClick={handleDownloadTemplate}>
-          빈 업로드 양식 다운로드
-        </button>
 
         <form onSubmit={handleSubmit}>
           <label className="form-field">
@@ -81,7 +59,7 @@ export default function ResidentStatementModal({ onClose }) {
             <input type="month" value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} />
           </label>
           <label className="form-field">
-            <span>수급자 데이터 엑셀</span>
+            <span>수급자 원본 엑셀</span>
             <input
               type="file"
               accept=".xlsx,.xls"

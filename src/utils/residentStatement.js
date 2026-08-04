@@ -1,9 +1,7 @@
 // 수급자별 "장기요양급여비용 명세서" 엑셀 생성.
-// 매달 정해진 형식(RESIDENT_STATEMENT_SCHEMA)의 엑셀을 업로드하면, 수급자 한 명당 시트 하나씩
-// 담긴 최종 명세서 파일을 만들어준다. 서식은 노인장기요양보험법 시행규칙 별지 제24호서식을
-// 기관 자체 양식으로 재구성한 것을 기준으로 한다.
-import { format } from "date-fns";
-
+// 국민건강보험공단 등에서 매달 다운로드하는, 수급자 한 명당 시트 하나씩 있는 원본 엑셀을 업로드하면
+// 그 안의 금액을 읽어서 위드온빌리지 자체 명세서 양식(노인장기요양보험법 시행규칙 별지 제24호서식을
+// 기관 양식으로 재구성한 것)으로 다시 만들어준다.
 const ORG = {
   code: "1-11530-00453",
   name: "위드온빌리지",
@@ -46,61 +44,62 @@ const formula = (f, extra = {}) => ({
   ...extra
 });
 
-export const RESIDENT_STATEMENT_SCHEMA = {
-  name: { column: "성명", type: String, required: true },
-  careNumber: { column: "장기요양인정번호", type: String, required: false },
-  periodStart: { column: "급여제공기간 시작일", type: Date, required: true },
-  periodEnd: { column: "급여제공기간 종료일", type: Date, required: true },
-  selfPay: { column: "본인부담금①", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  insurancePay: { column: "공단부담금②", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  mealCost: { column: "식사재료비④", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  roomUpgradeCost: { column: "추가비용⑤", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  groomingCost: { column: "이미용비⑥", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  otherCost: { column: "기타⑦", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  cardAmount: { column: "카드결제금액", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  receiptAmount: { column: "현금영수증금액", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  cashAmount: { column: "현금금액", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  prepaidAmount: { column: "이미납부한금액⑪", type: Number, required: false, propertyValueWhenCellIsEmpty: 0 },
-  note: { column: "비고", type: String, required: false },
-  status: { column: "구분(퇴소/중간)", type: String, required: false }
+// 원본 파일(시트 1개 = 수급자 1명)에서 값이 들어있는 고정 셀 위치.
+// [row, col] — 1행/1열부터 시작하는 엑셀 좌표.
+const SOURCE_CELLS = {
+  name: [8, 1], // A8
+  careNumber: [8, 3], // C8
+  period: [8, 6], // F8 (예: "2026.08.01~2026.08.31" — 이미 보기 좋은 형식이라 그대로 사용)
+  selfPay: [10, 6], // F10 본인부담금①
+  insurancePay: [11, 6], // F11 공단부담금②
+  mealCost: [14, 6], // F14 식사재료비④
+  roomUpgradeCost: [15, 6], // F15 추가비용⑤
+  groomingCost: [17, 6], // F17 이미용비⑥
+  otherCosts: [
+    [19, 6],
+    [21, 6],
+    [23, 6],
+    [25, 6],
+    [27, 6]
+  ] // F19,F21,F23,F25,F27 기타⑦ 개별 항목 (최대 5건)
 };
 
-const TEMPLATE_COLUMNS = Object.values(RESIDENT_STATEMENT_SCHEMA).map((c) => c.column);
-
-const TEMPLATE_EXAMPLE_ROW = [
-  "홍길동",
-  "L2404193257",
-  new Date(2026, 7, 1),
-  new Date(2026, 7, 31),
-  14800,
-  133200,
-  0,
-  0,
-  0,
-  0,
-  0,
-  0,
-  14800,
-  0,
-  "예시 행입니다. 이 줄을 지우고 실제 데이터를 입력하세요.",
-  ""
-];
-
-export async function downloadResidentStatementTemplate() {
-  const writeExcelFile = (await import("write-excel-file/browser")).default;
-  const sheetData = [TEMPLATE_COLUMNS.map((c) => label(c)), TEMPLATE_EXAMPLE_ROW.map((v) => ({ value: v }))];
-  await writeExcelFile(sheetData, { fontFamily: "Malgun Gothic", fontSize: 10 }).toFile(
-    "수급자_명세서_업로드양식.xlsx"
-  );
+function cellAt(rows, [row, col]) {
+  return rows[row - 1]?.[col - 1];
 }
 
+function toNumber(v) {
+  return typeof v === "number" ? v : Number(v) || 0;
+}
+
+// 업로드한 워크북의 시트마다 수급자 한 명의 데이터를 뽑아낸다. 성명이 없는 시트(안내/빈 시트 등)는 건너뛴다.
 export async function parseResidentStatementFile(file) {
-  const { readSheet } = await import("read-excel-file/browser");
-  return readSheet(file, { schema: RESIDENT_STATEMENT_SCHEMA });
-}
+  const readXlsxFile = (await import("read-excel-file/browser")).default;
+  const sheets = await readXlsxFile(file);
 
-function periodText(start, end) {
-  return `${format(start, "yyyy . M . d")} ~ ${format(end, "yyyy . M . d")}`;
+  const residents = [];
+  const skipped = [];
+
+  for (const { sheet, data } of sheets) {
+    const name = cellAt(data, SOURCE_CELLS.name);
+    if (!name || typeof name !== "string") {
+      skipped.push(sheet);
+      continue;
+    }
+    residents.push({
+      name: name.trim(),
+      careNumber: cellAt(data, SOURCE_CELLS.careNumber) || "",
+      period: cellAt(data, SOURCE_CELLS.period) || "",
+      selfPay: toNumber(cellAt(data, SOURCE_CELLS.selfPay)),
+      insurancePay: toNumber(cellAt(data, SOURCE_CELLS.insurancePay)),
+      mealCost: toNumber(cellAt(data, SOURCE_CELLS.mealCost)),
+      roomUpgradeCost: toNumber(cellAt(data, SOURCE_CELLS.roomUpgradeCost)),
+      groomingCost: toNumber(cellAt(data, SOURCE_CELLS.groomingCost)),
+      otherCosts: SOURCE_CELLS.otherCosts.map((pos) => toNumber(cellAt(data, pos)))
+    });
+  }
+
+  return { residents, skipped };
 }
 
 function statusMark(resident, target) {
@@ -134,7 +133,7 @@ function buildResidentSheetData(resident, seq, billingMonth) {
     [label("주소"), text(ORG.address, { columnSpan: 3 }), null, null, label("사업자등록번호"), text(ORG.businessNumber, { columnSpan: 3 }), null, null],
 
     [label("성명"), label("장기요양인정번호", { columnSpan: 2 }), null, label("급여제공기간"), label("영수증 번호", { columnSpan: 4 }), null, null, null],
-    [text(resident.name), text(resident.careNumber, { columnSpan: 2 }), null, text(periodText(resident.periodStart, resident.periodEnd)), text(receiptNo, { columnSpan: 4 }), null, null, null],
+    [text(resident.name), text(resident.careNumber, { columnSpan: 2 }), null, text(resident.period), text(receiptNo, { columnSpan: 4 }), null, null, null],
 
     [label("항목", { columnSpan: 3 }), null, null, label("금액"), label("금액산정내역", { columnSpan: 4 }), null, null, null],
 
@@ -157,11 +156,11 @@ function buildResidentSheetData(resident, seq, billingMonth) {
     ],
     [null, label("상급침실 이용에 따른\n추가비용⑤", { columnSpan: 2 }), null, amount(resident.roomUpgradeCost), label("수납금액\n⑫\n(⑩-⑪)", { rowSpan: 4 }), label("카드"), amount(resident.cardAmount, { columnSpan: 2 }), null],
     [null, label("이ㆍ미용비⑥", { columnSpan: 2 }), null, amount(resident.groomingCost), null, label("현금영수증"), amount(resident.receiptAmount, { columnSpan: 2 }), null],
-    [null, label("기타\n⑦", { rowSpan: 5 }), blank(), amount(resident.otherCost), null, label("현금"), amount(resident.cashAmount, { columnSpan: 2 }), null],
-    [null, null, blank(), blank(), null, label("합계"), formula("=G12+G13+G14", { columnSpan: 2 }), null],
-    [null, null, blank(), blank(), label("현금영수증", { columnSpan: 4 }), null, null, null],
-    [null, null, blank(), blank(), label("신분확인번호"), blank({ columnSpan: 3 }), null, null],
-    [null, null, blank(), blank(), label("현금승인번호"), blank({ columnSpan: 3 }), null, null],
+    [null, label("기타\n⑦", { rowSpan: 5 }), blank(), amount(resident.otherCosts[0]), null, label("현금"), amount(resident.cashAmount, { columnSpan: 2 }), null],
+    [null, null, blank(), amount(resident.otherCosts[1]), null, label("합계"), formula("=G12+G13+G14", { columnSpan: 2 }), null],
+    [null, null, blank(), amount(resident.otherCosts[2]), label("현금영수증", { columnSpan: 4 }), null, null, null],
+    [null, null, blank(), amount(resident.otherCosts[3]), label("신분확인번호"), blank({ columnSpan: 3 }), null, null],
+    [null, null, blank(), amount(resident.otherCosts[4]), label("현금승인번호"), blank({ columnSpan: 3 }), null, null],
     [null, label("비급여 계 \n⑧(④+⑤+⑥+⑦)", { columnSpan: 2 }), null, formula("=D11+D12+D13+SUM(D14:D18)"), label("※ 비고"), text(resident.note, { columnSpan: 3 }), null, null],
 
     [
