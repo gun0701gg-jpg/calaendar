@@ -11,7 +11,7 @@ const ORG = {
   ceoLine: "장기요양기관명 : 위드온빌리지         대표자명 : 윤 건      (인)"
 };
 
-const BORDER = { borderStyle: "thin", borderColor: "#999999" };
+const BORDER = { borderStyle: "hair", borderColor: "#000000" };
 
 // 라벨(항목명) 칸 — 원본에서 거의 전부 굵게.
 const label = (value, extra = {}) => ({
@@ -312,6 +312,41 @@ function uniqueSheetName(name, index, used) {
   return candidate;
 }
 
+// write-excel-file은 인쇄 배율/여백을 설정하는 기능이 없어서, 파일을 만든 뒤 압축을 풀어 각 시트
+// XML에 원본 양식과 같은 인쇄 설정(A4, 세로, 84% 축소 — 27행이 한 페이지에 다 들어가도록)을 직접
+// 넣고 다시 압축한다.
+const PAGE_SETUP_XML =
+  '<pageMargins left="0.7480314960629921" right="0.7480314960629921" top="0.984251968503937" bottom="0.984251968503937" header="0.5118110236220472" footer="0.5118110236220472"/>' +
+  '<pageSetup paperSize="9" orientation="portrait" scale="84" horizontalDpi="300" verticalDpi="300"/>';
+
+async function applyPrintSettings(blob) {
+  const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const files = unzipSync(bytes);
+
+  for (const path of Object.keys(files)) {
+    if (/^xl\/worksheets\/sheet\d+\.xml$/.test(path)) {
+      const xml = strFromU8(files[path]).replace("</worksheet>", `${PAGE_SETUP_XML}</worksheet>`);
+      files[path] = strToU8(xml);
+    }
+  }
+
+  return new Blob([zipSync(files)], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function downloadResidentStatements(residents, billingMonth) {
   const writeExcelFile = (await import("write-excel-file/browser")).default;
   const used = new Set();
@@ -322,7 +357,7 @@ export async function downloadResidentStatements(residents, billingMonth) {
     columns: SHEET_COLUMNS
   }));
 
-  await writeExcelFile(sheets, { fontFamily: "Noto Sans KR", fontSize: 11 }).toFile(
-    `수급자명세서_${billingMonth}.xlsx`
-  );
+  const blob = await writeExcelFile(sheets, { fontFamily: "Noto Sans KR", fontSize: 11 }).toBlob();
+  const finalBlob = await applyPrintSettings(blob);
+  downloadBlob(finalBlob, `수급자명세서_${billingMonth}.xlsx`);
 }
