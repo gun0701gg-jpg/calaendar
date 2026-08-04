@@ -15,6 +15,7 @@ import DayPanel from "./components/DayPanel";
 import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
 import ConsultationView from "./components/ConsultationView";
 import AccessManageModal from "./components/AccessManageModal";
+import ResidentStatementModal from "./components/ResidentStatementModal";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { useAllowedEmails } from "./hooks/useAccessControl";
 
@@ -25,6 +26,7 @@ function CalendarApp({ readOnly }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uploadOpen, setUploadOpen] = useState(false);
   const [accessManageOpen, setAccessManageOpen] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
 
   const { gridStart, gridEnd } = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -70,6 +72,7 @@ function CalendarApp({ readOnly }) {
           setSelectedDate(new Date());
         }}
         onOpenUpload={() => setUploadOpen(true)}
+        onOpenStatement={() => setStatementOpen(true)}
         onOpenAccessManage={() => setAccessManageOpen(true)}
       />
       {uploadOpen && (
@@ -81,6 +84,7 @@ function CalendarApp({ readOnly }) {
         />
       )}
       {accessManageOpen && <AccessManageModal user={user} onClose={() => setAccessManageOpen(false)} />}
+      {statementOpen && <ResidentStatementModal onClose={() => setStatementOpen(false)} />}
       {showConsultation ? (
         <main className="app-main app-main--single">
           <ConsultationView user={user} />

@@ -11,6 +11,7 @@ export default function Header({
   onNextMonth,
   onToday,
   onOpenUpload,
+  onOpenStatement,
   onOpenAccessManage
 }) {
   const { user, login, logout } = useAuth();
@@ -31,11 +32,17 @@ export default function Header({
           >
             캘린더
           </button>
+          <button className="chip" onClick={onOpenUpload}>
+            근무표
+          </button>
           <button
             className={`chip ${activeView === "consultation" ? "chip--active" : ""}`}
             onClick={() => onSwitchView("consultation")}
           >
             입소상담
+          </button>
+          <button className="chip" onClick={onOpenStatement}>
+            수급자 명세서
           </button>
         </div>
       )}
@@ -52,11 +59,6 @@ export default function Header({
           <button className="btn btn--ghost btn--sm" onClick={onToday}>
             오늘
           </button>
-          {!readOnly && (
-            <button className="btn btn--primary btn--sm" onClick={onOpenUpload}>
-              근무표 올리기
-            </button>
-          )}
         </div>
       )}
 
