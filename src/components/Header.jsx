@@ -11,7 +11,6 @@ export default function Header({
   onNextMonth,
   onToday,
   onOpenUpload,
-  onOpenStatement,
   onOpenAccessManage
 }) {
   const { user, login, logout } = useAuth();
@@ -41,7 +40,10 @@ export default function Header({
           >
             입소상담
           </button>
-          <button className="chip" onClick={onOpenStatement}>
+          <button
+            className={`chip ${activeView === "statement" ? "chip--active" : ""}`}
+            onClick={() => onSwitchView("statement")}
+          >
             수급자 명세서
           </button>
         </div>

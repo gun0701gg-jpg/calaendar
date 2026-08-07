@@ -15,18 +15,17 @@ import DayPanel from "./components/DayPanel";
 import WorkScheduleUploadModal from "./components/WorkScheduleUploadModal";
 import ConsultationView from "./components/ConsultationView";
 import AccessManageModal from "./components/AccessManageModal";
-import ResidentStatementModal from "./components/ResidentStatementModal";
+import ResidentStatementView from "./components/ResidentStatementView";
 import { createSchedule, deleteSchedule, updateSchedule, useSchedules } from "./hooks/useSchedules";
 import { useAllowedEmails } from "./hooks/useAccessControl";
 
 function CalendarApp({ readOnly }) {
   const { user } = useAuth();
-  const [activeView, setActiveView] = useState("calendar"); // "calendar" | "consultation"
+  const [activeView, setActiveView] = useState("calendar"); // "calendar" | "consultation" | "statement"
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [uploadOpen, setUploadOpen] = useState(false);
   const [accessManageOpen, setAccessManageOpen] = useState(false);
-  const [statementOpen, setStatementOpen] = useState(false);
 
   const { gridStart, gridEnd } = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -57,6 +56,7 @@ function CalendarApp({ readOnly }) {
   const handleDelete = (id) => deleteSchedule(id);
 
   const showConsultation = !readOnly && activeView === "consultation";
+  const showStatement = !readOnly && activeView === "statement";
 
   return (
     <div className="app">
@@ -72,7 +72,6 @@ function CalendarApp({ readOnly }) {
           setSelectedDate(new Date());
         }}
         onOpenUpload={() => setUploadOpen(true)}
-        onOpenStatement={() => setStatementOpen(true)}
         onOpenAccessManage={() => setAccessManageOpen(true)}
       />
       {uploadOpen && (
@@ -84,10 +83,13 @@ function CalendarApp({ readOnly }) {
         />
       )}
       {accessManageOpen && <AccessManageModal user={user} onClose={() => setAccessManageOpen(false)} />}
-      {statementOpen && <ResidentStatementModal onClose={() => setStatementOpen(false)} />}
       {showConsultation ? (
         <main className="app-main app-main--single">
           <ConsultationView user={user} />
+        </main>
+      ) : showStatement ? (
+        <main className="app-main app-main--single">
+          <ResidentStatementView />
         </main>
       ) : (
         <main className="app-main">

@@ -821,6 +821,43 @@ button {
   color: #1c2a45;
 }
 
+/* Resident statement view */
+
+.statement-view {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.statement-view-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #1c2a45;
+}
+
+.statement-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.statement-derived-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
 .consultation-filter {
   display: flex;
   flex-wrap: wrap;

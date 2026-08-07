@@ -1,67 +1,37 @@
 // 수급자별 "장기요양급여비용 명세서" 엑셀 생성.
-// 국민건강보험공단 등에서 매달 다운로드하는 "청구명세 리스트"(시트 하나에 수급자별 한 줄씩,
-// 수급자명·공단부담금·본인부담금 열이 있는 표)를 업로드하면, 위드온빌리지 자체 명세서 양식으로
-// 다시 만들어준다. 서식은 새로 그리지 않고 public/templates/resident-statement-template.xlsx의
-// "명세서(양식)" 시트를 그대로 복제해서 값만 채워 넣기 때문에 글꼴·행높이·열너비·테두리가
-// 원본과 완전히 동일하다 (도장 이미지 등 그림 개체는 시트 복제 과정에서 제외된다).
+// 수급자현황·상급침실 추가비용·계약의사진찰비·진료약제비·가정간호비 5개 파일(+수급자현황에서 뽑아내는
+// 등급외비용)을 합친 데이터(residentDataMerge.js)를 받아서, 위드온빌리지 자체 명세서 양식으로
+// 수급자 한 명당 시트 하나씩 만들어준다. 서식은 새로 그리지 않고
+// public/templates/resident-statement-template.xlsx의 "명세서(양식)" 시트를 그대로 복제해서 값만
+// 채워 넣기 때문에 글꼴·행높이·열너비·테두리가 원본과 완전히 동일하다 (도장 이미지 등 그림 개체는
+// 시트 복제 과정에서 제외된다).
 const TEMPLATE_URL = "/templates/resident-statement-template.xlsx";
 const TEMPLATE_SHEET_PATH = "xl/worksheets/sheet2.xml"; // 템플릿 파일 안의 "명세서(양식)" 시트
 
 const ORG_NAME = "위드온빌리지";
 
-function toNumber(v) {
-  return typeof v === "number" ? v : Number(v) || 0;
-}
-
-// "청구명세 리스트" 표에서 필요한 열을 찾는다. 열 이름으로 찾아서, 리스트 앞뒤에 제목 줄이
-// 몇 줄 더 있거나 열 순서가 바뀌어도 안정적으로 읽을 수 있게 한다.
-const REQUIRED_COLUMNS = {
-  name: "수급자명",
-  insurancePay: "공단부담금",
-  selfPay: "본인부담금"
-};
-
-// 업로드한 표에서 "수급자명" 열이 있는 줄을 헤더로 보고, 그 아래 각 줄을 수급자 한 명으로 읽는다.
-export async function parseResidentStatementFile(file) {
-  const readXlsxFile = (await import("read-excel-file/browser")).default;
-  const sheets = await readXlsxFile(file);
-  const data = sheets[0]?.data || [];
-
-  const headerRowIndex = data.findIndex((row) => row.includes(REQUIRED_COLUMNS.name));
-  if (headerRowIndex === -1) {
-    return { residents: [], skipped: [] };
-  }
-
-  const headers = data[headerRowIndex];
-  const columnIndex = Object.fromEntries(
-    Object.entries(REQUIRED_COLUMNS).map(([key, header]) => [key, headers.indexOf(header)])
-  );
-
-  const residents = [];
-  for (let i = headerRowIndex + 1; i < data.length; i++) {
-    const row = data[i];
-    const name = row[columnIndex.name];
-    if (!name || typeof name !== "string") continue;
-
-    residents.push({
-      name: name.trim(),
-      careNumber: "",
-      period: "",
-      selfPay: toNumber(row[columnIndex.selfPay]),
-      insurancePay: toNumber(row[columnIndex.insurancePay]),
-      mealCost: 0,
-      roomUpgradeCost: 0,
-      groomingCost: 0,
-      otherCosts: [0, 0, 0, 0, 0],
-      prepaidAmount: 0,
-      cardAmount: 0,
-      receiptAmount: 0,
-      cashAmount: 0,
-      status: ""
-    });
-  }
-
-  return { residents, skipped: [] };
+// 병합된 수급자 데이터(residentDataMerge.js의 buildMergedResidentData 결과)를 명세서 양식이
+// 기대하는 모양으로 바꾼다. 장기요양인정번호·급여제공기간·이미납부한금액·카드/현금영수증/현금·
+// 퇴소여부는 6개 파일 어디에도 없는 값이라 빈 칸으로 두고, 필요하면 만들어진 파일에서 직접 채운다.
+// "기타⑦" 5칸에는 진료약제비·계약의사진찰비·가정간호비·등급외비용을 각각 나눠 담는다(장기요양급여비용
+// 명세서 서식에는 이 네 가지를 위한 전용 칸이 없다).
+export function residentStatementInputFromMerged(r) {
+  return {
+    name: r.name,
+    careNumber: "",
+    period: "",
+    selfPay: r.selfPay,
+    insurancePay: r.insurancePay,
+    mealCost: 0,
+    roomUpgradeCost: r.roomUpgradeCost,
+    groomingCost: 0,
+    otherCosts: [r.pharmacyCost, r.doctorFeeCost, r.nursingCost, r.gradeExemptAmount, 0],
+    prepaidAmount: 0,
+    cardAmount: 0,
+    receiptAmount: 0,
+    cashAmount: 0,
+    status: ""
+  };
 }
 
 function statusMark(resident, target) {
