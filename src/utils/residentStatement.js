@@ -154,9 +154,13 @@ function injectResidentValues(templateSheetXml, resident, seq, billingMonth) {
   xml = setNumberCell(xml, "G12", resident.cardAmount);
   xml = setNumberCell(xml, "G13", resident.receiptAmount);
   xml = setNumberCell(xml, "G14", resident.cashAmount);
-  // 원본 양식에는 ⑨총액/⑩본인부담총액 수식이 비어 있어서, 사용안내에 적힌 공식대로 채운다.
+  // 원본 양식에는 ③급여계/⑧비급여계/⑨총액/⑩본인부담총액/⑫수납합계 수식이 비어 있어서,
+  // 사용안내에 적힌 공식대로 채운다.
+  xml = setFormulaCell(xml, "D10", "D8+D9");
+  xml = setFormulaCell(xml, "D19", "D11+D12+D13+SUM(D14:D18)");
   xml = setFormulaCell(xml, "G8", "D10+D19");
   xml = setFormulaCell(xml, "G10", "D8+D19");
+  xml = setFormulaCell(xml, "G15", "G12+G13+G14");
   xml = setTextCell(xml, "H1", `${statusMark(resident, "퇴소")}  퇴 소`);
   xml = setTextCell(xml, "H2", `${statusMark(resident, "중간")}  중 간`);
   xml = setNumberCell(xml, "A22", issueDateSerial);
