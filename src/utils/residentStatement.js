@@ -15,13 +15,15 @@ const ORG_NAME = "위드온빌리지";
 // 어디에도 없는 값이라 빈 칸으로 두고, 필요하면 만들어진 파일에서 직접 채운다.
 // "기타⑦" 칸에는 계약의사진찰비·진료약제비·가정간호비·등급외비용을 양식에 적힌 순서(C14~C17)
 // 그대로 나눠 담는다.
+// 이 명세서는 수급자 개인이 실제로 부담한 금액만 안내하는 목적이라, 공단부담금②은 항상 0으로
+// 적는다(집계표에는 실제 공단부담금이 그대로 들어간다).
 export function residentStatementInputFromMerged(r) {
   return {
     name: r.name,
     careNumber: r.careNumber || "",
     period: "",
     selfPay: r.selfPay,
-    insurancePay: r.insurancePay,
+    insurancePay: 0,
     mealCost: r.mealCost,
     roomUpgradeCost: r.roomUpgradeCost,
     groomingCost: 0,
