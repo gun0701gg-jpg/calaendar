@@ -68,9 +68,9 @@ export async function downloadAggregateTable(residents, billingMonth) {
       numberCell(r.days),
       numberCell(r.insurancePay),
       numberCell(r.selfPay),
-      numberCell(0), // 식사재료비
+      numberCell(r.mealCost),
       numberCell(0), // 경관유동식
-      numberCell(0), // 간식비
+      numberCell(r.snackCost),
       numberCell(r.roomUpgradeCost),
       numberCell(0), // 이,미용비
       numberCell(r.pharmacyCost),

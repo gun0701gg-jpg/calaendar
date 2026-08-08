@@ -22,7 +22,7 @@ export function residentStatementInputFromMerged(r) {
     period: "",
     selfPay: r.selfPay,
     insurancePay: r.insurancePay,
-    mealCost: 0,
+    mealCost: r.mealCost,
     roomUpgradeCost: r.roomUpgradeCost,
     groomingCost: 0,
     otherCosts: [r.doctorFeeCost, r.pharmacyCost, r.nursingCost, r.gradeExemptAmount, 0],

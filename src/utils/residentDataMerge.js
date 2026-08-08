@@ -32,9 +32,10 @@ function findColumn(headers, candidates) {
 
 // File1(수급자현황). 두 가지 표 형식을 모두 지원한다.
 // - 업무포털 "수급자정보" 내보내기: 수급현황(입소중인 사람만 사용)/수급자명/인정등급/본인부담률(예:
-//   "감경(8%)")/인정번호 열이 있는 표. 일수·공단부담금·본인부담금·등급외 금액은 이 표에는 없다.
-// - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률/일수/공단부담금/본인부담금/등급외
-//   금액이 모두 있는 표.
+//   "감경(8%)")/인정번호 열이 있는 표.
+// - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률 열이 있는 표.
+// 일수·공단부담금·본인부담금·식사재료비·간식비·등급외 금액은 파일에서 읽지 않고 등급별 산식으로
+// 계산한다(computeGradeBasedAmounts 참고).
 export async function parseRosterFile(file) {
   const sheets = await readWorkbook(file);
   const data = sheets[0]?.data || [];
@@ -51,11 +52,7 @@ export async function parseRosterFile(file) {
     name: findColumn(headers, ["수급자명"]),
     grade: findColumn(headers, ["인정등급", "등급"]),
     selfPayRate: findColumn(headers, ["본인부담률"]),
-    careNumber: findColumn(headers, ["인정번호", "장기요양인정번호"]),
-    days: findColumn(headers, ["일수"]),
-    insurancePay: findColumn(headers, ["공단부담금"]),
-    selfPay: findColumn(headers, ["본인부담금"]),
-    gradeExempt: findColumn(headers, ["등급외"])
+    careNumber: findColumn(headers, ["인정번호", "장기요양인정번호"])
   };
 
   const roster = [];
@@ -66,23 +63,74 @@ export async function parseRosterFile(file) {
     // "수급현황" 열이 있는 표(업무포털 내보내기)는 "입소중"인 사람만 쓴다.
     if (col.status >= 0 && String(row[col.status] ?? "").trim() !== "입소중") continue;
 
-    // "감경(8%)"처럼 괄호 안에 실제 부담률이 있으면 그 부분만 쓰고, 아니면(예전 표) 그대로 쓴다.
+    // "감경(8%)"처럼 괄호 앞에 구분(기초/감경/일반/의료 등)이 있으면 따로 떼어 저장하고,
+    // 괄호 안 부담률만 selfPayRate로 쓴다. 괄호가 없으면(예전 표) 그대로 부담률로 쓴다.
     const rawRate = col.selfPayRate >= 0 ? String(row[col.selfPayRate] ?? "").trim() : "";
-    const rateMatch = rawRate.match(/\(([^)]+)\)/);
+    const rateMatch = rawRate.match(/^([^(]*)\(([^)]+)\)$/);
 
     roster.push({
       seq: col.seq >= 0 ? toNumber(row[col.seq]) : roster.length + 1,
       name,
       grade: col.grade >= 0 ? String(row[col.grade] ?? "").trim() : "",
-      selfPayRate: rateMatch ? rateMatch[1] : rawRate,
-      careNumber: col.careNumber >= 0 ? String(row[col.careNumber] ?? "").trim() : "",
-      days: col.days >= 0 ? toNumber(row[col.days]) : 0,
-      insurancePay: col.insurancePay >= 0 ? toNumber(row[col.insurancePay]) : 0,
-      selfPay: col.selfPay >= 0 ? toNumber(row[col.selfPay]) : 0,
-      gradeExemptAmount: col.gradeExempt >= 0 ? toNumber(row[col.gradeExempt]) : 0
+      selfPayRate: rateMatch ? rateMatch[2] : rawRate,
+      selfPayCategory: rateMatch ? rateMatch[1].trim() : "",
+      careNumber: col.careNumber >= 0 ? String(row[col.careNumber] ?? "").trim() : ""
     });
   }
   return roster;
+}
+
+// 등급별 1일 단가(장기요양 급여 산정 기준). 등급외는 원내 자체 기준 단가.
+const GRADE_DAILY_RATE = {
+  "1등급": 93070,
+  "2등급": 86340,
+  "3등급": 81540,
+  "4등급": 81540,
+  "5등급": 81540,
+  등급외: 100000
+};
+const MEAL_COST_PER_DAY = 4300 * 3;
+const SNACK_COST_PER_DAY = 1000 * 3;
+
+function daysInBillingMonth(billingMonth) {
+  const [y, m] = billingMonth.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+function parseRateFraction(rateText) {
+  const n = Number(String(rateText).replace("%", "").trim());
+  return Number.isFinite(n) ? n / 100 : 0;
+}
+
+// 공단부담금 = 등급별 금액 * 일수 * (1-본인부담률), 본인부담금 = 등급별 금액 * 일수 * 본인부담률.
+// 등급외는 공단부담금 개념이 없어서 전액을 등급외 열에 담는다(식사재료비·간식비도 이 금액에
+// 포함되는 것으로 보고 따로 계산하지 않는다).
+// 식사재료비/간식비는 기초수급자는 지자체보조금 정보가 아직 없어 0으로 비워두고(추후 직접 입력),
+// 그 외에는 일수 기준으로 계산한다.
+function computeGradeBasedAmounts(roster, days) {
+  const dailyRate = GRADE_DAILY_RATE[roster.grade];
+  const isBasicRecipient = roster.selfPayCategory === "기초";
+  const isGradeExempt = roster.grade === "등급외";
+  const mealCost = isBasicRecipient || isGradeExempt ? 0 : MEAL_COST_PER_DAY * days;
+  const snackCost = isBasicRecipient || isGradeExempt ? 0 : SNACK_COST_PER_DAY * days;
+
+  if (dailyRate === undefined) {
+    return { insurancePay: 0, selfPay: 0, gradeExemptAmount: 0, mealCost, snackCost };
+  }
+
+  const baseAmount = dailyRate * days;
+  if (isGradeExempt) {
+    return { insurancePay: 0, selfPay: 0, gradeExemptAmount: baseAmount, mealCost, snackCost };
+  }
+
+  const rate = parseRateFraction(roster.selfPayRate);
+  return {
+    insurancePay: baseAmount * (1 - rate),
+    selfPay: baseAmount * rate,
+    gradeExemptAmount: 0,
+    mealCost,
+    snackCost
+  };
 }
 
 // "26.08" 같은 시트 이름 형식으로 급여년월을 변환한다.
@@ -248,21 +296,27 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   [room.warning, doctor.warning, nursing.warning].forEach((w) => w && warnings.push(w));
 
-  const residents = roster.map((r) => ({
-    seq: r.seq,
-    name: r.name,
-    grade: r.grade,
-    selfPayRate: r.selfPayRate,
-    careNumber: r.careNumber,
-    days: r.days,
-    insurancePay: r.insurancePay,
-    selfPay: r.selfPay,
-    roomUpgradeCost: room.totals[r.name] || 0,
-    doctorFeeCost: doctor.totals[r.name] || 0,
-    pharmacyCost: pharmacy[r.name] || 0,
-    nursingCost: nursing.totals[r.name] || 0,
-    gradeExemptAmount: r.grade === "등급외" ? r.gradeExemptAmount : 0
-  }));
+  const days = daysInBillingMonth(billingMonth);
+  const residents = roster.map((r) => {
+    const amounts = computeGradeBasedAmounts(r, days);
+    return {
+      seq: r.seq,
+      name: r.name,
+      grade: r.grade,
+      selfPayRate: r.selfPayRate,
+      careNumber: r.careNumber,
+      days,
+      insurancePay: amounts.insurancePay,
+      selfPay: amounts.selfPay,
+      mealCost: amounts.mealCost,
+      snackCost: amounts.snackCost,
+      roomUpgradeCost: room.totals[r.name] || 0,
+      doctorFeeCost: doctor.totals[r.name] || 0,
+      pharmacyCost: pharmacy[r.name] || 0,
+      nursingCost: nursing.totals[r.name] || 0,
+      gradeExemptAmount: amounts.gradeExemptAmount
+    };
+  });
 
   return { residents, warnings };
 }
