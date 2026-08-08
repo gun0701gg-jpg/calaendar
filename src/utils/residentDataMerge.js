@@ -103,16 +103,15 @@ function parseRateFraction(rateText) {
 }
 
 // 공단부담금 = 등급별 금액 * 일수 * (1-본인부담률), 본인부담금 = 등급별 금액 * 일수 * 본인부담률.
-// 등급외는 공단부담금 개념이 없어서 전액을 등급외 열에 담는다(식사재료비·간식비도 이 금액에
-// 포함되는 것으로 보고 따로 계산하지 않는다).
-// 식사재료비/간식비는 기초수급자는 지자체보조금 정보가 아직 없어 0으로 비워두고(추후 직접 입력),
-// 그 외에는 일수 기준으로 계산한다.
+// 등급외는 공단부담금 개념이 없어서 전액을 등급외 열에 담는다.
+// 식사재료비/간식비는 등급과 상관없이 실제로 식사를 제공한 만큼 매기는 별도 항목이라 등급외도
+// 똑같이 계산한다. 기초수급자만 지자체보조금 정보가 아직 없어 0으로 비워둔다(추후 직접 입력).
 function computeGradeBasedAmounts(roster, days) {
   const dailyRate = GRADE_DAILY_RATE[roster.grade];
   const isBasicRecipient = roster.selfPayCategory === "기초";
   const isGradeExempt = roster.grade === "등급외";
-  const mealCost = isBasicRecipient || isGradeExempt ? 0 : MEAL_COST_PER_DAY * days;
-  const snackCost = isBasicRecipient || isGradeExempt ? 0 : SNACK_COST_PER_DAY * days;
+  const mealCost = isBasicRecipient ? 0 : MEAL_COST_PER_DAY * days;
+  const snackCost = isBasicRecipient ? 0 : SNACK_COST_PER_DAY * days;
 
   if (dailyRate === undefined) {
     return { insurancePay: 0, selfPay: 0, gradeExemptAmount: 0, mealCost, snackCost };

@@ -79,14 +79,16 @@ export async function downloadAggregateTable(residents, billingMonth) {
     ];
   });
 
-  // 맨 아래에 열별 합계 행을 추가한다(연번 칸에 "합계" 표시, 수급자명/등급/본인부담률 칸은 비움).
+  // 맨 아래에 열별 합계 행을 추가한다(연번 칸에 "합계" 표시, 수급자명/등급/본인부담률/일수 칸은 비움 —
+  // 일수는 더해도 의미가 없는 값이라 합계에서 뺀다).
   const lastDataRow = residents.length + 1;
   const totalRow = [
     textCell("합계"),
     textCell(""),
     textCell(""),
     textCell(""),
-    ...["E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"].map((col) =>
+    textCell(""),
+    ...["F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"].map((col) =>
       formulaCell(`SUM(${col}2:${col}${lastDataRow})`)
     )
   ];
