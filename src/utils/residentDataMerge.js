@@ -31,9 +31,11 @@ function findColumn(headers, candidates) {
 }
 
 // File1(수급자현황). 두 가지 표 형식을 모두 지원한다.
-// - 업무포털 "수급자정보" 내보내기: 수급현황(입소중인 사람만 사용)/수급자명/인정등급/본인부담률(예:
-//   "감경(8%)")/인정번호 열이 있는 표.
-// - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률 열이 있는 표.
+// - 업무포털 "수급자정보" 내보내기: 수급현황/수급자명/인정등급/본인부담률(예: "감경(8%)")/인정번호
+//   열이 있는 표. 입소중·퇴소 모두 읽어두고, 최종적으로 포함할지는 buildMergedResidentData에서
+//   정한다(입소중은 전부, 퇴소는 청구금액이 있는 사람만).
+// - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률 열이 있는 표. 수급현황 열이
+//   없으면 전부 "입소중"으로 본다.
 // 일수 열이 있으면 그 값을 쓰고, 없으면 급여년월의 날짜 수로 대신한다(daysInBillingMonth).
 // 공단부담금·본인부담금·식사재료비·간식비·등급외 금액은 파일에서 읽지 않고 등급별 산식으로
 // 계산한다(computeGradeBasedAmounts 참고).
@@ -62,8 +64,7 @@ export async function parseRosterFile(file) {
     const row = data[i];
     const name = normName(row[col.name]);
     if (!name) continue;
-    // "수급현황" 열이 있는 표(업무포털 내보내기)는 "입소중"인 사람만 쓴다.
-    if (col.status >= 0 && String(row[col.status] ?? "").trim() !== "입소중") continue;
+    const status = col.status >= 0 ? String(row[col.status] ?? "").trim() || "입소중" : "입소중";
 
     // "감경(8%)"처럼 괄호 앞에 구분(기초/감경/일반/의료 등)이 있으면 따로 떼어 저장하고,
     // 괄호 안 부담률만 selfPayRate로 쓴다. 괄호가 없으면(예전 표) 그대로 부담률로 쓴다.
@@ -73,6 +74,7 @@ export async function parseRosterFile(file) {
     roster.push({
       seq: col.seq >= 0 ? toNumber(row[col.seq]) : roster.length + 1,
       name,
+      status,
       grade: col.grade >= 0 ? String(row[col.grade] ?? "").trim() : "",
       selfPayRate: rateMatch ? rateMatch[2] : rawRate,
       selfPayCategory: rateMatch ? rateMatch[1].trim() : "",
@@ -438,11 +440,27 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   [room.warning, doctor.warning, nursing.warning, pharmacy.warning].forEach((w) => w && warnings.push(w));
 
-  const residents = rosterWithDays.map((r) => {
+  const allResidents = rosterWithDays.map((r) => {
     const amounts = computeGradeBasedAmounts(r, r.days);
+    const roomUpgradeCost = room.totals[r.name] || 0;
+    const doctorFeeCost = doctor.totals[r.name] || 0;
+    const pharmacyCost = pharmacy.totals[r.name] || 0;
+    const nursingCost = nursing.totals[r.name] || 0;
+    // 공단부담금(insurancePay)은 국민건강보험공단이 부담하는 몫이라 "청구금액"에서는 뺀다.
+    const billedAmount =
+      amounts.selfPay +
+      amounts.mealCost +
+      amounts.snackCost +
+      roomUpgradeCost +
+      doctorFeeCost +
+      pharmacyCost +
+      nursingCost +
+      amounts.gradeExemptAmount;
+
     return {
       seq: r.seq,
       name: r.name,
+      status: r.status,
       grade: r.grade,
       selfPayRate: r.selfPayRate,
       careNumber: r.careNumber,
@@ -451,13 +469,21 @@ export async function buildMergedResidentData(files, billingMonth) {
       selfPay: amounts.selfPay,
       mealCost: amounts.mealCost,
       snackCost: amounts.snackCost,
-      roomUpgradeCost: room.totals[r.name] || 0,
-      doctorFeeCost: doctor.totals[r.name] || 0,
-      pharmacyCost: pharmacy.totals[r.name] || 0,
-      nursingCost: nursing.totals[r.name] || 0,
-      gradeExemptAmount: amounts.gradeExemptAmount
+      roomUpgradeCost,
+      doctorFeeCost,
+      pharmacyCost,
+      nursingCost,
+      gradeExemptAmount: amounts.gradeExemptAmount,
+      billedAmount
     };
   });
+
+  // 입소중인 사람은 전부, 퇴소한 사람은 청구금액이 있는 사람만 포함한다(입소중 우선 정렬).
+  // 연번은 최종 목록 순서대로 다시 매긴다.
+  const residents = allResidents
+    .filter((r) => r.status === "입소중" || r.billedAmount > 0)
+    .sort((a, b) => (a.status === "입소중") === (b.status === "입소중") ? 0 : a.status === "입소중" ? -1 : 1)
+    .map((r, i) => ({ ...r, seq: i + 1 }));
 
   return { residents, warnings };
 }

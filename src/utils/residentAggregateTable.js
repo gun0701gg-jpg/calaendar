@@ -12,7 +12,7 @@ function headerCell(value) {
   return { value, type: String, ...HEADER_STYLE, ...BORDER_STYLE };
 }
 
-// A~D열(연번/수급자명/등급/본인부담률)은 가운데 정렬.
+// A~E열(연번/수급현황/수급자명/등급/본인부담률)은 가운데 정렬.
 function textCell(value) {
   return { value, type: String, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
@@ -21,12 +21,12 @@ function seqCell(value) {
   return { value, type: Number, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
 
-// E~S열(일수~당월입금액)은 회계 서식(기호없음).
+// F~T열(일수~당월입금액)은 회계 서식(기호없음).
 function numberCell(value) {
   return { value, type: Number, format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
 }
 
-// E열(일수)은 가운데 정렬.
+// F열(일수)은 가운데 정렬.
 function centeredNumberCell(value) {
   return { value, type: Number, align: "center", format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
 }
@@ -40,6 +40,7 @@ export async function downloadAggregateTable(residents, billingMonth) {
 
   const headerRow = [
     "연번",
+    "수급현황",
     "수급자명",
     "등급",
     "본인부담률",
@@ -64,6 +65,7 @@ export async function downloadAggregateTable(residents, billingMonth) {
     const row = i + 2; // 1행은 헤더
     return [
       seqCell(r.seq),
+      textCell(r.status),
       textCell(r.name),
       textCell(r.grade),
       textCell(r.selfPayRate),
@@ -77,16 +79,16 @@ export async function downloadAggregateTable(residents, billingMonth) {
       numberCell(r.doctorFeeCost),
       numberCell(r.nursingCost), // 가정간호비
       numberCell(r.gradeExemptAmount),
-      formulaCell(`SUM(G${row}:N${row})`), // 본인부담금(G)부터 등급외(N)까지
+      formulaCell(`SUM(H${row}:O${row})`), // 본인부담금(H)부터 등급외(O)까지
       numberCell(0), // 이전미납액
       numberCell(0), // 선납적용액
-      formulaCell(`O${row}+P${row}-Q${row}`),
+      formulaCell(`P${row}+Q${row}-R${row}`),
       numberCell(0) // 당월입금액
     ];
   });
 
-  // 맨 아래에 열별 합계 행을 추가한다(연번 칸에 "합계" 표시, 수급자명/등급/본인부담률/일수 칸은 비움 —
-  // 일수는 더해도 의미가 없는 값이라 합계에서 뺀다).
+  // 맨 아래에 열별 합계 행을 추가한다(연번 칸에 "합계" 표시, 수급현황/수급자명/등급/본인부담률/일수
+  // 칸은 비움 — 일수는 더해도 의미가 없는 값이라 합계에서 뺀다).
   const lastDataRow = residents.length + 1;
   const totalRow = [
     textCell("합계"),
@@ -94,13 +96,14 @@ export async function downloadAggregateTable(residents, billingMonth) {
     textCell(""),
     textCell(""),
     textCell(""),
-    ...["F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"].map((col) =>
+    textCell(""),
+    ...["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"].map((col) =>
       formulaCell(`SUM(${col}2:${col}${lastDataRow})`)
     )
   ];
 
-  // A~E는 기존 넓이를 유지하고, F~S(공단부담금~당월입금액)는 모두 12로 통일한다.
-  const columnWidths = [6, 10, 8, 10, 6, ...Array(14).fill(12)];
+  // A~F는 기존 넓이를 유지하고, G~T(공단부담금~당월입금액)는 모두 12로 통일한다.
+  const columnWidths = [6, 8, 10, 8, 10, 6, ...Array(14).fill(12)];
 
   await writeExcelFile([headerRow, ...dataRows, totalRow], {
     sheet: "청구명세리스트",
