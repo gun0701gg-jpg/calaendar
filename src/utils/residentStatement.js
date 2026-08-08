@@ -201,6 +201,17 @@ function buildContentTypesXml(count) {
   );
 }
 
+// 템플릿 시트에는 도장 이미지(drawing)와 인쇄 설정(printerSettings) 관계가 걸려 있는데, 시트를
+// 복제할 때 그 관계 파일(xl/drawings/..., xl/printerSettings/...)까지는 같이 복제하지 않는다.
+// 그 상태로 두면 참조가 붕 떠서 엑셀이 파일을 열 때마다 "복구" 창을 띄우며 도형을 지워버리므로,
+// 복제하기 전에 그 참조 자체를 시트 XML에서 제거한다(인쇄 배율 등 나머지 pageSetup 속성은 유지).
+function stripDanglingRelationships(xml) {
+  return xml
+    .replace(/<drawing\b[^>]*\/>/g, "")
+    .replace(/<legacyDrawing\b[^>]*\/>/g, "")
+    .replace(/(<pageSetup\b[^>]*?)\s+r:id="[^"]*"([^>]*\/>)/, "$1$2");
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -221,7 +232,7 @@ export async function downloadResidentStatements(residents, billingMonth) {
   }
   const templateBytes = new Uint8Array(await templateResponse.arrayBuffer());
   const templateFiles = unzipSync(templateBytes);
-  const templateSheetXml = strFromU8(templateFiles[TEMPLATE_SHEET_PATH]);
+  const templateSheetXml = stripDanglingRelationships(strFromU8(templateFiles[TEMPLATE_SHEET_PATH]));
 
   const outFiles = {
     "_rels/.rels": templateFiles["_rels/.rels"],
