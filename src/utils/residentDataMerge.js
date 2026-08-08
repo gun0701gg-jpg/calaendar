@@ -56,7 +56,8 @@ export async function parseRosterFile(file) {
     grade: findColumn(headers, ["인정등급", "등급"]),
     selfPayRate: findColumn(headers, ["본인부담률"]),
     careNumber: findColumn(headers, ["인정번호", "장기요양인정번호"]),
-    days: findColumn(headers, ["일수"])
+    days: findColumn(headers, ["일수"]),
+    dischargeDate: findColumn(headers, ["퇴소일"])
   };
 
   const roster = [];
@@ -79,10 +80,28 @@ export async function parseRosterFile(file) {
       selfPayRate: rateMatch ? rateMatch[2] : rawRate,
       selfPayCategory: rateMatch ? rateMatch[1].trim() : "",
       careNumber: col.careNumber >= 0 ? String(row[col.careNumber] ?? "").trim() : "",
-      days: col.days >= 0 ? toNumber(row[col.days]) : null
+      days: col.days >= 0 ? toNumber(row[col.days]) : null,
+      dischargeDate: col.dischargeDate >= 0 ? parseDateValue(row[col.dischargeDate]) : null
     });
   }
   return roster;
+}
+
+// "2026.05.15(18:10)" 같은 문자열이나 Date 객체를 모두 날짜로 바꾼다.
+function parseDateValue(v) {
+  if (v instanceof Date) return v;
+  if (typeof v === "string") {
+    const m = v.trim().match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  return null;
+}
+
+// 퇴소일이 급여년월의 1일보다 앞이면(=이번 달이 시작되기 전에 이미 퇴소) true.
+function dischargedBeforeBillingMonth(dischargeDate, billingMonth) {
+  if (!dischargeDate) return false;
+  const [y, m] = billingMonth.split("-").map(Number);
+  return dischargeDate < new Date(y, m - 1, 1);
 }
 
 // 등급별 1일 단가(장기요양 급여 산정 기준). 등급외는 원내 자체 기준 단가.
@@ -442,20 +461,24 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   const allResidents = rosterWithDays.map((r) => {
     const amounts = computeGradeBasedAmounts(r, r.days);
-    const roomUpgradeCost = room.totals[r.name] || 0;
     const doctorFeeCost = doctor.totals[r.name] || 0;
     const pharmacyCost = pharmacy.totals[r.name] || 0;
     const nursingCost = nursing.totals[r.name] || 0;
+
+    // 이번 달이 시작되기 전에 이미 퇴소한 사람은 이번 달 요양 서비스를 받지 않았으므로,
+    // 공단부담금·본인부담금·식사재료비·간식비·상급침실비·등급외는 0으로 두고, 서비스 이후
+    // 늦게 청구되는 진료약제비·계약의사진찰비·가정간호비만 반영한다.
+    const alreadyGone = dischargedBeforeBillingMonth(r.dischargeDate, billingMonth);
+    const insurancePay = alreadyGone ? 0 : amounts.insurancePay;
+    const selfPay = alreadyGone ? 0 : amounts.selfPay;
+    const mealCost = alreadyGone ? 0 : amounts.mealCost;
+    const snackCost = alreadyGone ? 0 : amounts.snackCost;
+    const roomUpgradeCost = alreadyGone ? 0 : room.totals[r.name] || 0;
+    const gradeExemptAmount = alreadyGone ? 0 : amounts.gradeExemptAmount;
+
     // 공단부담금(insurancePay)은 국민건강보험공단이 부담하는 몫이라 "청구금액"에서는 뺀다.
     const billedAmount =
-      amounts.selfPay +
-      amounts.mealCost +
-      amounts.snackCost +
-      roomUpgradeCost +
-      doctorFeeCost +
-      pharmacyCost +
-      nursingCost +
-      amounts.gradeExemptAmount;
+      selfPay + mealCost + snackCost + roomUpgradeCost + doctorFeeCost + pharmacyCost + nursingCost + gradeExemptAmount;
 
     return {
       seq: r.seq,
@@ -465,15 +488,15 @@ export async function buildMergedResidentData(files, billingMonth) {
       selfPayRate: r.selfPayRate,
       careNumber: r.careNumber,
       days: r.days,
-      insurancePay: amounts.insurancePay,
-      selfPay: amounts.selfPay,
-      mealCost: amounts.mealCost,
-      snackCost: amounts.snackCost,
+      insurancePay,
+      selfPay,
+      mealCost,
+      snackCost,
       roomUpgradeCost,
       doctorFeeCost,
       pharmacyCost,
       nursingCost,
-      gradeExemptAmount: amounts.gradeExemptAmount,
+      gradeExemptAmount,
       billedAmount
     };
   });
