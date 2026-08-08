@@ -15,6 +15,13 @@ function normName(v) {
   return typeof v === "string" ? v.trim() : "";
 }
 
+async function readWorkbook(file) {
+  const { sanitizeXlsxFile } = await import("./xlsxSanitize.js");
+  const readXlsxFile = (await import("read-excel-file/browser")).default;
+  const safeFile = await sanitizeXlsxFile(file);
+  return readXlsxFile(safeFile);
+}
+
 const ROSTER_HEADERS = {
   seq: "연번",
   name: "수급자명",
@@ -28,8 +35,7 @@ const ROSTER_HEADERS = {
 
 // File1(수급자현황): 연번/수급자명/등급/본인부담률/일수/공단부담금/본인부담금 + (등급외인 경우) 등급외 금액.
 export async function parseRosterFile(file) {
-  const readXlsxFile = (await import("read-excel-file/browser")).default;
-  const sheets = await readXlsxFile(file);
+  const sheets = await readWorkbook(file);
   const data = sheets[0]?.data || [];
 
   const headerRowIndex = data.findIndex(
@@ -99,8 +105,7 @@ function sumRowsByName(data, names) {
 // 시트가 여러 개면(예: 월별 시트) 급여년월과 이름이 같은 시트를 찾아서 쓰고, 못 찾으면 첫 시트를
 // 쓰면서 경고 메시지를 남긴다.
 export async function sumCostFile(file, roster, billingMonth) {
-  const readXlsxFile = (await import("read-excel-file/browser")).default;
-  const sheets = await readXlsxFile(file);
+  const sheets = await readWorkbook(file);
   const names = new Set(roster.map((r) => r.name));
 
   let chosen = sheets[0];
