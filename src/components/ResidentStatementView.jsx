@@ -100,7 +100,7 @@ export default function ResidentStatementView() {
       )}
 
       <div className="form-actions">
-        <button type="button" className="btn btn--ghost" onClick={handleAggregate} disabled={status === "working"}>
+        <button type="button" className="btn btn--primary" onClick={handleAggregate} disabled={status === "working"}>
           {status === "working" ? "생성 중..." : "명세서 집계표 생성"}
         </button>
         <button type="button" className="btn btn--primary" onClick={handleStatements} disabled={status === "working"}>
