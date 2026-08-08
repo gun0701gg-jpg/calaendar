@@ -107,7 +107,7 @@ export async function sumCostFile(file, roster, billingMonth) {
   let warning = "";
   if (sheets.length > 1) {
     const label = monthSheetLabel(billingMonth);
-    const match = sheets.find((s) => s.sheet.trim() === label);
+    const match = sheets.find((s) => typeof s.sheet === "string" && s.sheet.trim() === label);
     if (match) {
       chosen = match;
     } else {
@@ -185,6 +185,16 @@ export async function sumPharmacyPdf(file, roster) {
 
 // 6개 파일을 모두 읽어서 수급자 이름 기준으로 병합한다.
 // files: { rosterFile, roomFile, doctorFile, pharmacyFile, nursingFile } (등급외비용은 별도 파일 없음)
+// 어느 파일을 읽다가 실패했는지 알 수 있도록, 각 파일 파싱 단계를 이름표를 붙여 감싼다.
+async function withFileLabel(label, task) {
+  try {
+    return await task();
+  } catch (err) {
+    const reason = err?.message || String(err);
+    throw new Error(`[${label}] 파일을 읽는 중 오류가 발생했습니다: ${reason}`);
+  }
+}
+
 export async function buildMergedResidentData(files, billingMonth) {
   const { rosterFile, roomFile, doctorFile, pharmacyFile, nursingFile } = files;
 
@@ -192,7 +202,7 @@ export async function buildMergedResidentData(files, billingMonth) {
     throw new Error("수급자현황 파일을 업로드해주세요.");
   }
 
-  const roster = await parseRosterFile(rosterFile);
+  const roster = await withFileLabel("1.수급자현황", () => parseRosterFile(rosterFile));
   if (roster.length === 0) {
     throw new Error("수급자현황 파일에서 수급자 목록을 찾지 못했습니다. \"수급자명\"·\"등급\" 열이 있는지 확인해주세요.");
   }
@@ -200,11 +210,19 @@ export async function buildMergedResidentData(files, billingMonth) {
   const warnings = [];
 
   const [room, doctor, nursing] = await Promise.all([
-    roomFile ? sumCostFile(roomFile, roster, billingMonth) : { totals: {}, warning: "" },
-    doctorFile ? sumCostFile(doctorFile, roster, billingMonth) : { totals: {}, warning: "" },
-    nursingFile ? sumCostFile(nursingFile, roster, billingMonth) : { totals: {}, warning: "" }
+    roomFile
+      ? withFileLabel("2.상급침실", () => sumCostFile(roomFile, roster, billingMonth))
+      : { totals: {}, warning: "" },
+    doctorFile
+      ? withFileLabel("3.계약의사진찰비", () => sumCostFile(doctorFile, roster, billingMonth))
+      : { totals: {}, warning: "" },
+    nursingFile
+      ? withFileLabel("5.가정간호비", () => sumCostFile(nursingFile, roster, billingMonth))
+      : { totals: {}, warning: "" }
   ]);
-  const pharmacy = pharmacyFile ? await sumPharmacyPdf(pharmacyFile, roster) : {};
+  const pharmacy = pharmacyFile
+    ? await withFileLabel("4.진료약제비", () => sumPharmacyPdf(pharmacyFile, roster))
+    : {};
 
   [room.warning, doctor.warning, nursing.warning].forEach((w) => w && warnings.push(w));
 
