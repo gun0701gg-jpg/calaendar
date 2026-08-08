@@ -13,8 +13,8 @@ const ORG_NAME = "위드온빌리지";
 // 병합된 수급자 데이터(residentDataMerge.js의 buildMergedResidentData 결과)를 명세서 양식이
 // 기대하는 모양으로 바꾼다. 장기요양인정번호·급여제공기간·이미납부한금액·카드/현금영수증/현금·
 // 퇴소여부는 6개 파일 어디에도 없는 값이라 빈 칸으로 두고, 필요하면 만들어진 파일에서 직접 채운다.
-// "기타⑦" 5칸에는 진료약제비·계약의사진찰비·가정간호비·등급외비용을 각각 나눠 담는다(장기요양급여비용
-// 명세서 서식에는 이 네 가지를 위한 전용 칸이 없다).
+// "기타⑦" 칸에는 계약의사진찰비·진료약제비·가정간호비·등급외비용을 양식에 적힌 순서(C14~C17)
+// 그대로 나눠 담는다.
 export function residentStatementInputFromMerged(r) {
   return {
     name: r.name,
@@ -25,7 +25,7 @@ export function residentStatementInputFromMerged(r) {
     mealCost: 0,
     roomUpgradeCost: r.roomUpgradeCost,
     groomingCost: 0,
-    otherCosts: [r.pharmacyCost, r.doctorFeeCost, r.nursingCost, r.gradeExemptAmount, 0],
+    otherCosts: [r.doctorFeeCost, r.pharmacyCost, r.nursingCost, r.gradeExemptAmount, 0],
     prepaidAmount: 0,
     cardAmount: 0,
     receiptAmount: 0,
