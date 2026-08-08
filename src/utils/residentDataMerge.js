@@ -34,7 +34,8 @@ function findColumn(headers, candidates) {
 // - 업무포털 "수급자정보" 내보내기: 수급현황(입소중인 사람만 사용)/수급자명/인정등급/본인부담률(예:
 //   "감경(8%)")/인정번호 열이 있는 표.
 // - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률 열이 있는 표.
-// 일수·공단부담금·본인부담금·식사재료비·간식비·등급외 금액은 파일에서 읽지 않고 등급별 산식으로
+// 일수 열이 있으면 그 값을 쓰고, 없으면 급여년월의 날짜 수로 대신한다(daysInBillingMonth).
+// 공단부담금·본인부담금·식사재료비·간식비·등급외 금액은 파일에서 읽지 않고 등급별 산식으로
 // 계산한다(computeGradeBasedAmounts 참고).
 export async function parseRosterFile(file) {
   const sheets = await readWorkbook(file);
@@ -52,7 +53,8 @@ export async function parseRosterFile(file) {
     name: findColumn(headers, ["수급자명"]),
     grade: findColumn(headers, ["인정등급", "등급"]),
     selfPayRate: findColumn(headers, ["본인부담률"]),
-    careNumber: findColumn(headers, ["인정번호", "장기요양인정번호"])
+    careNumber: findColumn(headers, ["인정번호", "장기요양인정번호"]),
+    days: findColumn(headers, ["일수"])
   };
 
   const roster = [];
@@ -74,7 +76,8 @@ export async function parseRosterFile(file) {
       grade: col.grade >= 0 ? String(row[col.grade] ?? "").trim() : "",
       selfPayRate: rateMatch ? rateMatch[2] : rawRate,
       selfPayCategory: rateMatch ? rateMatch[1].trim() : "",
-      careNumber: col.careNumber >= 0 ? String(row[col.careNumber] ?? "").trim() : ""
+      careNumber: col.careNumber >= 0 ? String(row[col.careNumber] ?? "").trim() : "",
+      days: col.days >= 0 ? toNumber(row[col.days]) : null
     });
   }
   return roster;
@@ -295,8 +298,9 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   [room.warning, doctor.warning, nursing.warning].forEach((w) => w && warnings.push(w));
 
-  const days = daysInBillingMonth(billingMonth);
+  const fallbackDays = daysInBillingMonth(billingMonth);
   const residents = roster.map((r) => {
+    const days = r.days != null ? r.days : fallbackDays;
     const amounts = computeGradeBasedAmounts(r, days);
     return {
       seq: r.seq,

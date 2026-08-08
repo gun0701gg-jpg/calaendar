@@ -2,7 +2,8 @@
 // 열 구성은 기관에서 쓰는 집계표 양식을 그대로 따른다. 이전미납액·선납적용액·당월입금액은
 // 6개 파일로는 알 수 없어 0으로 비워두고, 필요하면 만들어진 파일에서 직접 채운다.
 
-const HEADER_STYLE = { fontWeight: "bold", backgroundColor: "#e5e7eb", align: "center" };
+const FONT_STYLE = { fontFamily: "Noto Sans KR" };
+const HEADER_STYLE = { fontWeight: "bold", backgroundColor: "#e5e7eb", align: "center", ...FONT_STYLE };
 const BORDER_STYLE = { borderStyle: "thin", borderColor: "#999999" };
 // "회계" 서식(기호 없음): 천 단위 구분 기호만 붙이고 통화 기호는 붙이지 않는다.
 const ACCOUNTING_FORMAT = '_-* #,##0_-;-* #,##0_-;_-* "-"_-;_-@_-';
@@ -13,20 +14,25 @@ function headerCell(value) {
 
 // A~D열(연번/수급자명/등급/본인부담률)은 가운데 정렬.
 function textCell(value) {
-  return { value, type: String, align: "center", ...BORDER_STYLE };
+  return { value, type: String, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
 
 function seqCell(value) {
-  return { value, type: Number, align: "center", ...BORDER_STYLE };
+  return { value, type: Number, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
 
 // E~S열(일수~당월입금액)은 회계 서식(기호없음).
 function numberCell(value) {
-  return { value, type: Number, format: ACCOUNTING_FORMAT, ...BORDER_STYLE };
+  return { value, type: Number, format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
+}
+
+// E열(일수)은 가운데 정렬.
+function centeredNumberCell(value) {
+  return { value, type: Number, align: "center", format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
 }
 
 function formulaCell(formula) {
-  return { value: formula, type: "Formula", format: ACCOUNTING_FORMAT, ...BORDER_STYLE };
+  return { value: formula, type: "Formula", format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
 }
 
 export async function downloadAggregateTable(residents, billingMonth) {
@@ -61,7 +67,7 @@ export async function downloadAggregateTable(residents, billingMonth) {
       textCell(r.name),
       textCell(r.grade),
       textCell(r.selfPayRate),
-      numberCell(r.days),
+      centeredNumberCell(r.days),
       numberCell(r.insurancePay),
       numberCell(r.selfPay),
       numberCell(r.mealCost),
@@ -93,7 +99,8 @@ export async function downloadAggregateTable(residents, billingMonth) {
     )
   ];
 
-  const columnWidths = [6, 10, 8, 10, 6, 12, 12, 10, 8, 10, 10, 12, 10, 10, 12, 10, 10, 12, 10];
+  // A~E는 기존 넓이를 유지하고, F~S(공단부담금~당월입금액)는 모두 12로 통일한다.
+  const columnWidths = [6, 10, 8, 10, 6, ...Array(14).fill(12)];
 
   await writeExcelFile([headerRow, ...dataRows, totalRow], {
     sheet: "청구명세리스트",
