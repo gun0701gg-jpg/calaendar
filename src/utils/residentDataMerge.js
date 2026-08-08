@@ -22,47 +22,64 @@ async function readWorkbook(file) {
   return readXlsxFile(safeFile);
 }
 
-const ROSTER_HEADERS = {
-  seq: "연번",
-  name: "수급자명",
-  grade: "등급",
-  selfPayRate: "본인부담률",
-  days: "일수",
-  insurancePay: "공단부담금",
-  selfPay: "본인부담금",
-  gradeExempt: "등급외"
-};
+function findColumn(headers, candidates) {
+  for (const name of candidates) {
+    const i = headers.indexOf(name);
+    if (i >= 0) return i;
+  }
+  return -1;
+}
 
-// File1(수급자현황): 연번/수급자명/등급/본인부담률/일수/공단부담금/본인부담금 + (등급외인 경우) 등급외 금액.
+// File1(수급자현황). 두 가지 표 형식을 모두 지원한다.
+// - 업무포털 "수급자정보" 내보내기: 수급현황(입소중인 사람만 사용)/수급자명/인정등급/본인부담률(예:
+//   "감경(8%)")/인정번호 열이 있는 표. 일수·공단부담금·본인부담금·등급외 금액은 이 표에는 없다.
+// - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률/일수/공단부담금/본인부담금/등급외
+//   금액이 모두 있는 표.
 export async function parseRosterFile(file) {
   const sheets = await readWorkbook(file);
   const data = sheets[0]?.data || [];
 
   const headerRowIndex = data.findIndex(
-    (row) => row.includes(ROSTER_HEADERS.name) && row.includes(ROSTER_HEADERS.grade)
+    (row) => row.includes("수급자명") && (row.includes("인정등급") || row.includes("등급"))
   );
   if (headerRowIndex === -1) return [];
 
   const headers = data[headerRowIndex];
-  const idx = Object.fromEntries(
-    Object.entries(ROSTER_HEADERS).map(([key, header]) => [key, headers.indexOf(header)])
-  );
+  const col = {
+    status: findColumn(headers, ["수급현황"]),
+    seq: findColumn(headers, ["연번"]),
+    name: findColumn(headers, ["수급자명"]),
+    grade: findColumn(headers, ["인정등급", "등급"]),
+    selfPayRate: findColumn(headers, ["본인부담률"]),
+    careNumber: findColumn(headers, ["인정번호", "장기요양인정번호"]),
+    days: findColumn(headers, ["일수"]),
+    insurancePay: findColumn(headers, ["공단부담금"]),
+    selfPay: findColumn(headers, ["본인부담금"]),
+    gradeExempt: findColumn(headers, ["등급외"])
+  };
 
   const roster = [];
   for (let i = headerRowIndex + 1; i < data.length; i++) {
     const row = data[i];
-    const name = normName(row[idx.name]);
+    const name = normName(row[col.name]);
     if (!name) continue;
+    // "수급현황" 열이 있는 표(업무포털 내보내기)는 "입소중"인 사람만 쓴다.
+    if (col.status >= 0 && String(row[col.status] ?? "").trim() !== "입소중") continue;
+
+    // "감경(8%)"처럼 괄호 안에 실제 부담률이 있으면 그 부분만 쓰고, 아니면(예전 표) 그대로 쓴다.
+    const rawRate = col.selfPayRate >= 0 ? String(row[col.selfPayRate] ?? "").trim() : "";
+    const rateMatch = rawRate.match(/\(([^)]+)\)/);
 
     roster.push({
-      seq: idx.seq >= 0 ? toNumber(row[idx.seq]) : roster.length + 1,
+      seq: col.seq >= 0 ? toNumber(row[col.seq]) : roster.length + 1,
       name,
-      grade: idx.grade >= 0 ? String(row[idx.grade] ?? "").trim() : "",
-      selfPayRate: idx.selfPayRate >= 0 ? String(row[idx.selfPayRate] ?? "").trim() : "",
-      days: idx.days >= 0 ? toNumber(row[idx.days]) : 0,
-      insurancePay: idx.insurancePay >= 0 ? toNumber(row[idx.insurancePay]) : 0,
-      selfPay: idx.selfPay >= 0 ? toNumber(row[idx.selfPay]) : 0,
-      gradeExemptAmount: idx.gradeExempt >= 0 ? toNumber(row[idx.gradeExempt]) : 0
+      grade: col.grade >= 0 ? String(row[col.grade] ?? "").trim() : "",
+      selfPayRate: rateMatch ? rateMatch[1] : rawRate,
+      careNumber: col.careNumber >= 0 ? String(row[col.careNumber] ?? "").trim() : "",
+      days: col.days >= 0 ? toNumber(row[col.days]) : 0,
+      insurancePay: col.insurancePay >= 0 ? toNumber(row[col.insurancePay]) : 0,
+      selfPay: col.selfPay >= 0 ? toNumber(row[col.selfPay]) : 0,
+      gradeExemptAmount: col.gradeExempt >= 0 ? toNumber(row[col.gradeExempt]) : 0
     });
   }
   return roster;
@@ -236,6 +253,7 @@ export async function buildMergedResidentData(files, billingMonth) {
     name: r.name,
     grade: r.grade,
     selfPayRate: r.selfPayRate,
+    careNumber: r.careNumber,
     days: r.days,
     insurancePay: r.insurancePay,
     selfPay: r.selfPay,
