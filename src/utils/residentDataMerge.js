@@ -185,12 +185,67 @@ function chooseSheet(sheets, billingMonth) {
   return { chosen, warning };
 }
 
+// 이름 열 머리글로 쓰이는 이름표들. 표(구간)가 여러 개 있는 파일에서도 각 구간의 이름 열을 찾는다.
+const NAME_HEADER_LABELS = ["성명", "대상자", "수급자명"];
+
+// 시트 전체에서 이름 열 머리글을 찾아 그 아래(다음 이름 열 머리글이 나오기 전까지) 각 줄의 이름과
+// 그 줄의 가장 오른쪽 숫자를 모두 모은다. "OO합계" 같은 소계 줄은 이름이 아니라서 제외한다.
+function collectNameAmountPairs(data) {
+  const pairs = [];
+  let activeCol = -1;
+  for (const row of data) {
+    const headerCol = row.findIndex(
+      (cell) => typeof cell === "string" && NAME_HEADER_LABELS.includes(cell.trim())
+    );
+    if (headerCol >= 0) {
+      activeCol = headerCol;
+      continue;
+    }
+    if (activeCol < 0) continue;
+
+    const name = typeof row[activeCol] === "string" ? row[activeCol].trim() : "";
+    if (!name || name.includes("합계")) continue;
+
+    let amount = null;
+    for (let i = row.length - 1; i >= 0; i--) {
+      if (typeof row[i] === "number") {
+        amount = row[i];
+        break;
+      }
+    }
+    if (!amount) continue;
+
+    pairs.push({ name, amount });
+  }
+  return pairs;
+}
+
+// 계약의사진찰비·진료약제비·가정간호비는 후불로 청구되는 항목이라, 청구서가 도착했을 때는 이미
+// 퇴소해서 이번 달 수급자현황(입소중 명단)에 없는 사람의 몫이 있을 수 있다. 그런 경우 자동으로는
+// 어디에도 반영되지 않고 조용히 빠지게 되므로, 놓치지 않도록 경고로 알려준다.
+function unmatchedNamesWarning(pairs, names) {
+  const byName = {};
+  for (const { name, amount } of pairs) {
+    if (names.has(name)) continue;
+    byName[name] = (byName[name] || 0) + amount;
+  }
+  const entries = Object.entries(byName);
+  if (entries.length === 0) return "";
+  const list = entries.map(([name, amount]) => `${name}(${amount.toLocaleString()}원)`).join(", ");
+  return `이번 달 수급자현황(입소중 명단)에 없는 이름의 금액이 있습니다(퇴소 후 후불 청구된 경우일 수 있으니 확인해주세요): ${list}`;
+}
+
 // File2(계약의사진찰비)/File4(가정간호비) 공용 파서.
 export async function sumCostFile(file, roster, billingMonth) {
   const sheets = await readWorkbook(file);
   const names = new Set(roster.map((r) => r.name));
   const { chosen, warning } = chooseSheet(sheets, billingMonth);
-  return { totals: sumRowsByName(chosen?.data || [], names), warning };
+  const data = chosen?.data || [];
+
+  const totals = sumRowsByName(data, names);
+  const unmatchedWarning = unmatchedNamesWarning(collectNameAmountPairs(data), names);
+
+  return { totals, warning: [warning, unmatchedWarning].filter(Boolean).join(" ") };
 }
 
 // File5(상급침실 이용에 따른 추가비용). "일요금" 열에 값이 있으면 일요금 * 일수로 계산하고,
@@ -239,6 +294,31 @@ export async function sumRoomUpgradeFile(file, rosterWithDays, billingMonth) {
   return { totals, warning };
 }
 
+// 순번(정수)으로 시작하고 그다음 칸이 이름인 줄들을 모아 이름·금액 쌍을 뽑는다("총 청구금액"·
+// "회차별 합계" 같은 안내/합계 줄은 순번으로 시작하지 않아서 자연히 제외된다).
+function collectPdfNameAmountPairs(rows) {
+  const pairs = [];
+  for (const row of rows) {
+    if (row.items.length < 2) continue;
+    if (!/^\d+$/.test(row.items[0].str)) continue;
+    const name = row.items[1].str;
+    if (!name || /^\d/.test(name)) continue;
+
+    let amount = null;
+    for (let i = row.items.length - 1; i >= 1; i--) {
+      const cleaned = row.items[i].str.replace(/,/g, "");
+      if (/^-?\d+$/.test(cleaned)) {
+        amount = Number(cleaned);
+        break;
+      }
+    }
+    if (!amount) continue;
+
+    pairs.push({ name, amount });
+  }
+  return pairs;
+}
+
 // File3(진료약제비, PDF 청구서). 텍스트 위치를 읽어 줄 단위로 묶은 뒤, 같은 규칙(이름이 있는 줄의
 // 가장 오른쪽 숫자)으로 이름별 합계를 구한다.
 export async function sumPharmacyPdf(file, roster) {
@@ -248,6 +328,7 @@ export async function sumPharmacyPdf(file, roster) {
 
   const names = new Set(roster.map((r) => r.name));
   const totals = {};
+  const allPairs = [];
 
   const buffer = await file.arrayBuffer();
   const doc = await pdfjsLib.getDocument({ data: buffer }).promise;
@@ -285,23 +366,26 @@ export async function sumPharmacyPdf(file, roster) {
       if (!matchedName) {
         matchedName = [...names].find((name) => rowText.includes(name)) || null;
       }
-      if (!matchedName) continue;
-
-      let amount = null;
-      for (let i = row.items.length - 1; i >= 0; i--) {
-        const cleaned = row.items[i].str.replace(/,/g, "");
-        if (/^-?\d+$/.test(cleaned)) {
-          amount = Number(cleaned);
-          break;
+      if (matchedName) {
+        let amount = null;
+        for (let i = row.items.length - 1; i >= 0; i--) {
+          const cleaned = row.items[i].str.replace(/,/g, "");
+          if (/^-?\d+$/.test(cleaned)) {
+            amount = Number(cleaned);
+            break;
+          }
+        }
+        if (amount !== null) {
+          totals[matchedName] = (totals[matchedName] || 0) + amount;
         }
       }
-      if (amount === null) continue;
-
-      totals[matchedName] = (totals[matchedName] || 0) + amount;
     }
+
+    allPairs.push(...collectPdfNameAmountPairs(rows));
   }
 
-  return totals;
+  const warning = unmatchedNamesWarning(allPairs, names);
+  return { totals, warning };
 }
 
 // 6개 파일을 모두 읽어서 수급자 이름 기준으로 병합한다.
@@ -350,9 +434,9 @@ export async function buildMergedResidentData(files, billingMonth) {
   ]);
   const pharmacy = pharmacyFile
     ? await withFileLabel("4.진료약제비", () => sumPharmacyPdf(pharmacyFile, roster))
-    : {};
+    : { totals: {}, warning: "" };
 
-  [room.warning, doctor.warning, nursing.warning].forEach((w) => w && warnings.push(w));
+  [room.warning, doctor.warning, nursing.warning, pharmacy.warning].forEach((w) => w && warnings.push(w));
 
   const residents = rosterWithDays.map((r) => {
     const amounts = computeGradeBasedAmounts(r, r.days);
@@ -369,7 +453,7 @@ export async function buildMergedResidentData(files, billingMonth) {
       snackCost: amounts.snackCost,
       roomUpgradeCost: room.totals[r.name] || 0,
       doctorFeeCost: doctor.totals[r.name] || 0,
-      pharmacyCost: pharmacy[r.name] || 0,
+      pharmacyCost: pharmacy.totals[r.name] || 0,
       nursingCost: nursing.totals[r.name] || 0,
       gradeExemptAmount: amounts.gradeExemptAmount
     };
