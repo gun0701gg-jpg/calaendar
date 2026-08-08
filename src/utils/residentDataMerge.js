@@ -168,13 +168,9 @@ function sumRowsByName(data, names) {
   return totals;
 }
 
-// File2(계약의사진찰비)/File4(가정간호비)/File5(상급침실 추가비용) 공용 파서.
 // 시트가 여러 개면(예: 월별 시트) 급여년월과 이름이 같은 시트를 찾아서 쓰고, 못 찾으면 첫 시트를
 // 쓰면서 경고 메시지를 남긴다.
-export async function sumCostFile(file, roster, billingMonth) {
-  const sheets = await readWorkbook(file);
-  const names = new Set(roster.map((r) => r.name));
-
+function chooseSheet(sheets, billingMonth) {
   let chosen = sheets[0];
   let warning = "";
   if (sheets.length > 1) {
@@ -186,8 +182,61 @@ export async function sumCostFile(file, roster, billingMonth) {
       warning = `"${label}" 이름의 시트를 찾지 못해 "${sheets[0]?.sheet}" 시트를 사용했습니다. 파일과 급여년월을 확인해주세요.`;
     }
   }
+  return { chosen, warning };
+}
 
+// File2(계약의사진찰비)/File4(가정간호비) 공용 파서.
+export async function sumCostFile(file, roster, billingMonth) {
+  const sheets = await readWorkbook(file);
+  const names = new Set(roster.map((r) => r.name));
+  const { chosen, warning } = chooseSheet(sheets, billingMonth);
   return { totals: sumRowsByName(chosen?.data || [], names), warning };
+}
+
+// File5(상급침실 이용에 따른 추가비용). "일요금" 열에 값이 있으면 일요금 * 일수로 계산하고,
+// "월요금" 열에 값이 있으면 월요금을 그 달 일수 기준으로 일할 계산한다(원 단위 절사).
+// rosterWithDays: 각 수급자의 최종 일수(days)까지 정해진 상태의 roster 배열.
+export async function sumRoomUpgradeFile(file, rosterWithDays, billingMonth) {
+  const sheets = await readWorkbook(file);
+  const daysByName = new Map(rosterWithDays.map((r) => [r.name, r.days]));
+  const { chosen, warning } = chooseSheet(sheets, billingMonth);
+  const data = chosen?.data || [];
+
+  const headerRowIndex = data.findIndex(
+    (row) => row.includes("수급자명") && (row.includes("일요금") || row.includes("월요금"))
+  );
+  if (headerRowIndex === -1) {
+    // 예상한 열 구성이 아니면, 이름이 있는 줄의 가장 오른쪽 숫자를 쓰는 예전 방식으로 대신한다.
+    return { totals: sumRowsByName(data, new Set(daysByName.keys())), warning };
+  }
+
+  const headers = data[headerRowIndex];
+  const nameIdx = headers.indexOf("수급자명");
+  const dailyIdx = headers.indexOf("일요금");
+  const monthlyIdx = headers.indexOf("월요금");
+  const daysInMonth = daysInBillingMonth(billingMonth);
+
+  const totals = {};
+  for (let i = headerRowIndex + 1; i < data.length; i++) {
+    const row = data[i];
+    const name = normName(row[nameIdx]);
+    if (!name || !daysByName.has(name)) continue;
+    const residentDays = daysByName.get(name);
+
+    const daily = dailyIdx >= 0 ? row[dailyIdx] : null;
+    const monthly = monthlyIdx >= 0 ? row[monthlyIdx] : null;
+
+    let amount = 0;
+    if (typeof daily === "number") {
+      amount = daily * residentDays;
+    } else if (typeof monthly === "number") {
+      amount = Math.floor((monthly * residentDays) / daysInMonth);
+    }
+    if (amount === 0) continue;
+
+    totals[name] = (totals[name] || 0) + amount;
+  }
+  return { totals, warning };
 }
 
 // File3(진료약제비, PDF 청구서). 텍스트 위치를 읽어 줄 단위로 묶은 뒤, 같은 규칙(이름이 있는 줄의
@@ -281,9 +330,16 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   const warnings = [];
 
+  // 상급침실비 일할 계산에 각 수급자의 최종 일수가 필요해서, 다른 파일을 읽기 전에 먼저 정한다.
+  const fallbackDays = daysInBillingMonth(billingMonth);
+  const rosterWithDays = roster.map((r) => ({
+    ...r,
+    days: r.days != null ? r.days : fallbackDays
+  }));
+
   const [room, doctor, nursing] = await Promise.all([
     roomFile
-      ? withFileLabel("2.상급침실", () => sumCostFile(roomFile, roster, billingMonth))
+      ? withFileLabel("2.상급침실", () => sumRoomUpgradeFile(roomFile, rosterWithDays, billingMonth))
       : { totals: {}, warning: "" },
     doctorFile
       ? withFileLabel("3.계약의사진찰비", () => sumCostFile(doctorFile, roster, billingMonth))
@@ -298,17 +354,15 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   [room.warning, doctor.warning, nursing.warning].forEach((w) => w && warnings.push(w));
 
-  const fallbackDays = daysInBillingMonth(billingMonth);
-  const residents = roster.map((r) => {
-    const days = r.days != null ? r.days : fallbackDays;
-    const amounts = computeGradeBasedAmounts(r, days);
+  const residents = rosterWithDays.map((r) => {
+    const amounts = computeGradeBasedAmounts(r, r.days);
     return {
       seq: r.seq,
       name: r.name,
       grade: r.grade,
       selfPayRate: r.selfPayRate,
       careNumber: r.careNumber,
-      days,
+      days: r.days,
       insurancePay: amounts.insurancePay,
       selfPay: amounts.selfPay,
       mealCost: amounts.mealCost,
