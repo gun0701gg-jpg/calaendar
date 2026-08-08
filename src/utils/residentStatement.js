@@ -212,6 +212,16 @@ function stripDanglingRelationships(xml) {
     .replace(/(<pageSetup\b[^>]*?)\s+r:id="[^"]*"([^>]*\/>)/, "$1$2");
 }
 
+// "기타⑦" 칸(C14~C17)에 항목 이름을 채운다. 양식 파일에 이미 적혀있어야 정상이지만,
+// 혹시 비어있는 양식이 올라오더라도 항상 채워지도록 매번 덮어쓴다.
+const OTHER_COST_LABELS = ["계약의사진찰비", "진료약제비", "가정간호비", "등급외비용"];
+function ensureOtherCostLabels(xml) {
+  return OTHER_COST_LABELS.reduce(
+    (acc, label, i) => setTextCell(acc, `C${14 + i}`, label),
+    xml
+  );
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -232,7 +242,9 @@ export async function downloadResidentStatements(residents, billingMonth) {
   }
   const templateBytes = new Uint8Array(await templateResponse.arrayBuffer());
   const templateFiles = unzipSync(templateBytes);
-  const templateSheetXml = stripDanglingRelationships(strFromU8(templateFiles[TEMPLATE_SHEET_PATH]));
+  const templateSheetXml = ensureOtherCostLabels(
+    stripDanglingRelationships(strFromU8(templateFiles[TEMPLATE_SHEET_PATH]))
+  );
 
   const outFiles = {
     "_rels/.rels": templateFiles["_rels/.rels"],
