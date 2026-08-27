@@ -3,10 +3,11 @@
 // 등급외비용)을 합친 데이터(residentDataMerge.js)를 받아서, 위드온빌리지 자체 명세서 양식으로
 // 수급자 한 명당 시트 하나씩 만들어준다. 서식은 새로 그리지 않고
 // public/templates/resident-statement-template.xlsx의 "명세서(양식)" 시트를 그대로 복제해서 값만
-// 채워 넣기 때문에 글꼴·행높이·열너비·테두리가 원본과 완전히 동일하다 (도장 이미지 등 그림 개체는
-// 시트 복제 과정에서 제외된다).
+// 채워 넣기 때문에 글꼴·행높이·열너비·테두리·도장 이미지까지 원본과 완전히 동일하다.
 const TEMPLATE_URL = "/templates/resident-statement-template.xlsx";
 const TEMPLATE_SHEET_PATH = "xl/worksheets/sheet2.xml"; // 템플릿 파일 안의 "명세서(양식)" 시트
+const TEMPLATE_DRAWING_PATH = "xl/drawings/drawing1.xml"; // "명세서(양식)" 시트에 걸린 도장 이미지 배치 정보
+const TEMPLATE_DRAWING_RELS_PATH = "xl/drawings/_rels/drawing1.xml.rels"; // 위 배치 정보 → 실제 이미지 파일
 
 const ORG_NAME = "위드온빌리지";
 
@@ -183,19 +184,40 @@ function buildWorkbookRelsXml(count) {
   );
 }
 
-function buildContentTypesXml(count) {
+const IMAGE_CONTENT_TYPES = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  emf: "image/x-emf",
+  bmp: "image/bmp"
+};
+
+function buildContentTypesXml(count, imageExt) {
   const sheetOverrides = Array.from(
     { length: count },
     (_, i) =>
       `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
   ).join("");
+  const drawingOverrides = imageExt
+    ? Array.from(
+        { length: count },
+        (_, i) =>
+          `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`
+      ).join("")
+    : "";
+  const imageDefault = imageExt
+    ? `<Default Extension="${imageExt}" ContentType="${IMAGE_CONTENT_TYPES[imageExt] || "image/png"}"/>`
+    : "";
   return (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
     '<Default Extension="xml" ContentType="application/xml"/>' +
+    imageDefault +
     '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
     sheetOverrides +
+    drawingOverrides +
     '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>' +
     '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
     '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>' +
@@ -203,15 +225,33 @@ function buildContentTypesXml(count) {
   );
 }
 
-// 템플릿 시트에는 도장 이미지(drawing)와 인쇄 설정(printerSettings) 관계가 걸려 있는데, 시트를
-// 복제할 때 그 관계 파일(xl/drawings/..., xl/printerSettings/...)까지는 같이 복제하지 않는다.
-// 그 상태로 두면 참조가 붕 떠서 엑셀이 파일을 열 때마다 "복구" 창을 띄우며 도형을 지워버리므로,
-// 복제하기 전에 그 참조 자체를 시트 XML에서 제거한다(인쇄 배율 등 나머지 pageSetup 속성은 유지).
+// 템플릿 시트에는 도장 이미지(drawing)와 인쇄 설정(printerSettings) 관계가 걸려 있다. 인쇄 설정은
+// 시트마다 복제하지 않으므로 그 참조만 지우고(인쇄 배율 등 나머지 pageSetup 속성은 유지), 도장
+// 이미지는 시트마다 자기만의 drawing 관계 파일을 새로 만들어줄 것이므로 관계 ID를 "rId1" 하나로
+// 정리해둔다(원래 템플릿의 인쇄 설정이 rId1을 쓰고 있어서 도장과 번호가 겹치지 않게 바꿔야 한다).
+function normalizeSheetRelationships(xml) {
+  return xml
+    .replace(/<drawing\b([^>]*?)\s+r:id="[^"]*"([^>]*)\/>/, '<drawing$1 r:id="rId1"$2/>')
+    .replace(/(<pageSetup\b[^>]*?)\s+r:id="[^"]*"([^>]*\/>)/, "$1$2")
+    .replace(/<legacyDrawing\b[^>]*\/>/g, "");
+}
+
+// 도장 이미지를 템플릿에서 찾지 못했을 때(옛 템플릿 등) 쓰는 대체 경로: 참조를 복제하는 대신
+// 아예 지워서, 참조만 남고 실제 파일이 없어 엑셀이 "복구" 경고를 띄우는 일을 막는다.
 function stripDanglingRelationships(xml) {
   return xml
     .replace(/<drawing\b[^>]*\/>/g, "")
     .replace(/<legacyDrawing\b[^>]*\/>/g, "")
     .replace(/(<pageSetup\b[^>]*?)\s+r:id="[^"]*"([^>]*\/>)/, "$1$2");
+}
+
+function sheetRelsXml(drawingTarget) {
+  return (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="${drawingTarget}"/>` +
+    "</Relationships>"
+  );
 }
 
 // "기타⑦" 칸(C14~C17)에 항목 이름을 채운다. 양식 파일에 이미 적혀있어야 정상이지만,
@@ -244,8 +284,23 @@ export async function downloadResidentStatements(residents, billingMonth) {
   }
   const templateBytes = new Uint8Array(await templateResponse.arrayBuffer());
   const templateFiles = unzipSync(templateBytes);
+
+  // 도장 이미지는 템플릿에 있을 때만 옮긴다. 배치 정보(drawing1.xml)와 그 배치가 가리키는 실제
+  // 이미지 파일(drawing1.xml.rels의 Target)을 찾아, 수급자 시트마다 자기만의 배치 정보 사본을
+  // 만들어 같은 이미지 파일을 같이 참조하게 한다(이미지 자체는 한 번만 들어있으면 된다).
+  const drawingXml = templateFiles[TEMPLATE_DRAWING_PATH];
+  const drawingRelsXml = drawingXml ? strFromU8(templateFiles[TEMPLATE_DRAWING_RELS_PATH] || new Uint8Array()) : "";
+  const imageTargetMatch = drawingRelsXml.match(/Target="\.\.\/media\/([^"]+)"/);
+  const imageFileName = imageTargetMatch ? imageTargetMatch[1] : null;
+  const imageExt = imageFileName ? imageFileName.split(".").pop().toLowerCase() : null;
+  const hasStamp = Boolean(drawingXml && imageFileName && templateFiles[`xl/media/${imageFileName}`]);
+
+  // 도장을 옮길 수 있으면 시트마다 자기만의 drawing 참조로 정리하고, 옮길 수 없으면(이미지가
+  // 없는 템플릿 등) 참조 자체를 지워서 붕 뜨지 않게 한다.
   const templateSheetXml = ensureOtherCostLabels(
-    stripDanglingRelationships(strFromU8(templateFiles[TEMPLATE_SHEET_PATH]))
+    hasStamp
+      ? normalizeSheetRelationships(strFromU8(templateFiles[TEMPLATE_SHEET_PATH]))
+      : stripDanglingRelationships(strFromU8(templateFiles[TEMPLATE_SHEET_PATH]))
   );
 
   const outFiles = {
@@ -254,18 +309,26 @@ export async function downloadResidentStatements(residents, billingMonth) {
     "xl/theme/theme1.xml": templateFiles["xl/theme/theme1.xml"],
     "xl/sharedStrings.xml": templateFiles["xl/sharedStrings.xml"]
   };
+  if (hasStamp) {
+    outFiles[`xl/media/${imageFileName}`] = templateFiles[`xl/media/${imageFileName}`];
+  }
 
   const used = new Set();
   const sheetEntries = residents.map((resident, i) => {
     const seq = i + 1;
     const sheetXml = injectResidentValues(templateSheetXml, resident, seq, billingMonth);
     outFiles[`xl/worksheets/sheet${seq}.xml`] = strToU8(sheetXml);
+    if (hasStamp) {
+      outFiles[`xl/drawings/drawing${seq}.xml`] = drawingXml;
+      outFiles[`xl/drawings/_rels/drawing${seq}.xml.rels`] = strToU8(drawingRelsXml);
+      outFiles[`xl/worksheets/_rels/sheet${seq}.xml.rels`] = strToU8(sheetRelsXml(`../drawings/drawing${seq}.xml`));
+    }
     return { id: seq, name: uniqueSheetName(resident.name, i, used) };
   });
 
   outFiles["xl/workbook.xml"] = strToU8(buildWorkbookXml(sheetEntries));
   outFiles["xl/_rels/workbook.xml.rels"] = strToU8(buildWorkbookRelsXml(sheetEntries.length));
-  outFiles["[Content_Types].xml"] = strToU8(buildContentTypesXml(sheetEntries.length));
+  outFiles["[Content_Types].xml"] = strToU8(buildContentTypesXml(sheetEntries.length, hasStamp ? imageExt : null));
 
   const zipped = zipSync(outFiles);
   const blob = new Blob([zipped], {
