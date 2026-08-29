@@ -113,7 +113,7 @@ const GRADE_DAILY_RATE = {
   "5등급": 81540,
   등급외: 100000
 };
-const MEAL_COST_PER_DAY = 4300 * 3;
+const MEAL_COST_PER_DAY = 4300 * 3 + 1000;
 const SNACK_COST_PER_DAY = 1000 * 3;
 
 function daysInBillingMonth(billingMonth) {
