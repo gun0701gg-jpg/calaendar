@@ -21,7 +21,7 @@ function seqCell(value) {
   return { value, type: Number, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
 
-// F~T열(일수~당월입금액)은 회계 서식(기호없음).
+// F~S열(일수~당월입금액)은 회계 서식(기호없음).
 function numberCell(value) {
   return { value, type: Number, format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
 }
@@ -48,7 +48,6 @@ export async function downloadAggregateTable(residents, billingMonth) {
     "공단부담금",
     "본인부담금",
     "식사재료비",
-    "간식비",
     "상급침실비",
     "진료약제비",
     "계약의사진찰비",
@@ -72,17 +71,16 @@ export async function downloadAggregateTable(residents, billingMonth) {
       centeredNumberCell(r.days),
       numberCell(r.insurancePay),
       numberCell(r.selfPay),
-      numberCell(r.mealCost),
-      numberCell(r.snackCost),
+      numberCell(r.mealCost), // 간식비 포함
       numberCell(r.roomUpgradeCost),
       numberCell(r.pharmacyCost),
       numberCell(r.doctorFeeCost),
       numberCell(r.nursingCost), // 가정간호비
       numberCell(r.gradeExemptAmount),
-      formulaCell(`SUM(H${row}:O${row})`), // 본인부담금(H)부터 등급외(O)까지
+      formulaCell(`SUM(H${row}:N${row})`), // 본인부담금(H)부터 등급외(N)까지
       numberCell(0), // 이전미납액
       numberCell(0), // 선납적용액
-      formulaCell(`P${row}+Q${row}-R${row}`),
+      formulaCell(`O${row}+P${row}-Q${row}`),
       numberCell(0) // 당월입금액
     ];
   });
@@ -97,16 +95,22 @@ export async function downloadAggregateTable(residents, billingMonth) {
     textCell(""),
     textCell(""),
     textCell(""),
-    ...["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"].map((col) =>
+    ...["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"].map((col) =>
       formulaCell(`SUM(${col}2:${col}${lastDataRow})`)
     )
   ];
 
-  // A~F는 기존 넓이를 유지하고, G~T(공단부담금~당월입금액)는 모두 12로 통일한다.
-  const columnWidths = [6, 8, 10, 8, 10, 6, ...Array(14).fill(12)];
+  // A~F는 기존 넓이를 유지하고, G~S(공단부담금~당월입금액)는 모두 12로 통일한다.
+  const columnWidths = [6, 8, 10, 8, 10, 6, ...Array(13).fill(12)];
 
-  await writeExcelFile([headerRow, ...dataRows, totalRow], {
-    sheet: "청구명세리스트",
+  // 합계 행 위에 빈 줄을 하나 두어서, 나중에 데이터 영역만 정렬(sorting)해도 합계 행이 데이터
+  // 사이로 딸려 들어가지 않게 한다.
+  const blankRow = new Array(headerRow.length).fill(null);
+
+  const monthNumber = Number(billingMonth.split("-")[1]);
+
+  await writeExcelFile([headerRow, ...dataRows, blankRow, totalRow], {
+    sheet: `${monthNumber}월명세서집계표`,
     columns: columnWidths.map((width) => ({ width }))
   }).toFile(`명세서집계표_${billingMonth}.xlsx`);
 }

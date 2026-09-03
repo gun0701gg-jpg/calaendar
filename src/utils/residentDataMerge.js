@@ -37,7 +37,7 @@ function findColumn(headers, candidates) {
 // - (예전 방식) 청구명세리스트 형태: 연번/수급자명/등급/본인부담률 열이 있는 표. 수급현황 열이
 //   없으면 전부 "입소중"으로 본다.
 // 일수 열이 있으면 그 값을 쓰고, 없으면 급여년월의 날짜 수로 대신한다(daysInBillingMonth).
-// 공단부담금·본인부담금·식사재료비·간식비·등급외 금액은 파일에서 읽지 않고 등급별 산식으로
+// 공단부담금·본인부담금·식사재료비(간식비 포함)·등급외 금액은 파일에서 읽지 않고 등급별 산식으로
 // 계산한다(computeGradeBasedAmounts 참고).
 export async function parseRosterFile(file) {
   const sheets = await readWorkbook(file);
@@ -113,8 +113,9 @@ const GRADE_DAILY_RATE = {
   "5등급": 81540,
   등급외: 100000
 };
-const MEAL_COST_PER_DAY = 4300 * 3 + 1000;
-const SNACK_COST_PER_DAY = 1000 * 3;
+// 간식비(1,000×3×일수)는 집계표/명세서에 따로 열을 두지 않고 식사재료비에 합쳐서 표시하기로
+// 해서, 식사재료비 단가에 간식비 단가를 합쳐 넣는다.
+const MEAL_COST_PER_DAY = 4300 * 3 + 1000 + 1000 * 3;
 
 function daysInBillingMonth(billingMonth) {
   const [y, m] = billingMonth.split("-").map(Number);
@@ -128,22 +129,21 @@ function parseRateFraction(rateText) {
 
 // 공단부담금 = 등급별 금액 * 일수 * (1-본인부담률), 본인부담금 = 등급별 금액 * 일수 * 본인부담률.
 // 등급외는 공단부담금 개념이 없어서 전액을 등급외 열에 담는다.
-// 식사재료비/간식비는 등급과 상관없이 실제로 식사를 제공한 만큼 매기는 별도 항목이라 등급외도
-// 똑같이 계산한다. 기초수급자만 지자체보조금 정보가 아직 없어 0으로 비워둔다(추후 직접 입력).
+// 식사재료비(간식비 포함)는 등급과 상관없이 실제로 식사를 제공한 만큼 매기는 별도 항목이라
+// 등급외도 똑같이 계산한다. 기초수급자만 지자체보조금 정보가 아직 없어 0으로 비워둔다(추후 직접 입력).
 function computeGradeBasedAmounts(roster, days) {
   const dailyRate = GRADE_DAILY_RATE[roster.grade];
   const isBasicRecipient = roster.selfPayCategory === "기초";
   const isGradeExempt = roster.grade === "등급외";
   const mealCost = isBasicRecipient ? 0 : MEAL_COST_PER_DAY * days;
-  const snackCost = isBasicRecipient ? 0 : SNACK_COST_PER_DAY * days;
 
   if (dailyRate === undefined) {
-    return { insurancePay: 0, selfPay: 0, gradeExemptAmount: 0, mealCost, snackCost };
+    return { insurancePay: 0, selfPay: 0, gradeExemptAmount: 0, mealCost };
   }
 
   const baseAmount = dailyRate * days;
   if (isGradeExempt) {
-    return { insurancePay: 0, selfPay: 0, gradeExemptAmount: baseAmount, mealCost, snackCost };
+    return { insurancePay: 0, selfPay: 0, gradeExemptAmount: baseAmount, mealCost };
   }
 
   const rate = parseRateFraction(roster.selfPayRate);
@@ -151,8 +151,7 @@ function computeGradeBasedAmounts(roster, days) {
     insurancePay: baseAmount * (1 - rate),
     selfPay: baseAmount * rate,
     gradeExemptAmount: 0,
-    mealCost,
-    snackCost
+    mealCost
   };
 }
 
@@ -458,19 +457,18 @@ export async function buildMergedResidentData(files, billingMonth) {
     const nursingCost = nursing.totals[r.name] || 0;
 
     // 이번 달이 시작되기 전에 이미 퇴소한 사람은 이번 달 요양 서비스를 받지 않았으므로,
-    // 공단부담금·본인부담금·식사재료비·간식비·상급침실비·등급외는 0으로 두고, 서비스 이후
+    // 공단부담금·본인부담금·식사재료비(간식비 포함)·상급침실비·등급외는 0으로 두고, 서비스 이후
     // 늦게 청구되는 진료약제비·계약의사진찰비·가정간호비만 반영한다.
     const alreadyGone = dischargedBeforeBillingMonth(r.dischargeDate, billingMonth);
     const insurancePay = alreadyGone ? 0 : amounts.insurancePay;
     const selfPay = alreadyGone ? 0 : amounts.selfPay;
     const mealCost = alreadyGone ? 0 : amounts.mealCost;
-    const snackCost = alreadyGone ? 0 : amounts.snackCost;
     const roomUpgradeCost = alreadyGone ? 0 : room.totals[r.name] || 0;
     const gradeExemptAmount = alreadyGone ? 0 : amounts.gradeExemptAmount;
 
     // 공단부담금(insurancePay)은 국민건강보험공단이 부담하는 몫이라 "청구금액"에서는 뺀다.
     const billedAmount =
-      selfPay + mealCost + snackCost + roomUpgradeCost + doctorFeeCost + pharmacyCost + nursingCost + gradeExemptAmount;
+      selfPay + mealCost + roomUpgradeCost + doctorFeeCost + pharmacyCost + nursingCost + gradeExemptAmount;
 
     return {
       seq: r.seq,
@@ -483,7 +481,6 @@ export async function buildMergedResidentData(files, billingMonth) {
       insurancePay,
       selfPay,
       mealCost,
-      snackCost,
       roomUpgradeCost,
       doctorFeeCost,
       pharmacyCost,
