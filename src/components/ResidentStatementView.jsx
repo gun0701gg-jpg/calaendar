@@ -39,7 +39,7 @@ export default function ResidentStatementView() {
         setMessage("수급자현황 파일에서 수급자 목록을 찾지 못했습니다.");
         return;
       }
-      await task(residents);
+      await task(residents, warnings);
       setStatus("done");
       const warningText = warnings.length ? `\n주의: ${warnings.join("\n")}` : "";
       setMessage(`${residents.length}명 처리했습니다.${warningText}`);
@@ -51,11 +51,11 @@ export default function ResidentStatementView() {
   };
 
   const handleAggregate = () =>
-    runWithMergedData((residents) => downloadAggregateTable(residents, billingMonth));
+    runWithMergedData((residents, warnings) => downloadAggregateTable(residents, billingMonth, warnings));
 
   const handleStatements = () =>
-    runWithMergedData((residents) =>
-      downloadResidentStatements(residents.map(residentStatementInputFromMerged), billingMonth)
+    runWithMergedData((residents, warnings) =>
+      downloadResidentStatements(residents.map(residentStatementInputFromMerged), billingMonth, warnings)
     );
 
   return (

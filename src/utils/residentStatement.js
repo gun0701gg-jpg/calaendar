@@ -193,15 +193,15 @@ const IMAGE_CONTENT_TYPES = {
   bmp: "image/bmp"
 };
 
-function buildContentTypesXml(count, imageExt) {
+function buildContentTypesXml(sheetCount, drawingCount, imageExt) {
   const sheetOverrides = Array.from(
-    { length: count },
+    { length: sheetCount },
     (_, i) =>
       `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`
   ).join("");
   const drawingOverrides = imageExt
     ? Array.from(
-        { length: count },
+        { length: drawingCount },
         (_, i) =>
           `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`
       ).join("")
@@ -264,6 +264,26 @@ function ensureOtherCostLabels(xml) {
   );
 }
 
+// 주의사항이 있으면 맨 앞에 별도 시트로 넣어서, 화면 메시지만 보고 놓치는 일이 없게 한다.
+function buildWarningsSheetXml(warnings) {
+  const lines = ["※ 자동 생성 시 확인이 필요한 주의사항", "", ...warnings];
+  const rows = lines
+    .map((line, i) => {
+      const r = i + 1;
+      return `<row r="${r}"><c r="A${r}" t="inlineStr"><is><t xml:space="preserve">${escapeXmlText(
+        line
+      )}</t></is></c></row>`;
+    })
+    .join("");
+  return (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<cols><col min="1" max="1" width="110" customWidth="1"/></cols>' +
+    `<sheetData>${rows}</sheetData>` +
+    "</worksheet>"
+  );
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -275,7 +295,7 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadResidentStatements(residents, billingMonth) {
+export async function downloadResidentStatements(residents, billingMonth, warnings = []) {
   const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
 
   const templateResponse = await fetch(TEMPLATE_URL);
@@ -313,22 +333,41 @@ export async function downloadResidentStatements(residents, billingMonth) {
     outFiles[`xl/media/${imageFileName}`] = templateFiles[`xl/media/${imageFileName}`];
   }
 
+  // 주의사항이 있으면 맨 앞(시트1)에 별도 시트로 넣고, 수급자별 명세서는 그 뒤로 한 칸씩 밀린다.
+  // 접수번호(receiptNumber)에 쓰는 순번은 수급자 순서 그대로(주의사항 시트 유무와 무관)이고,
+  // 도장 이미지 파일 번호도 수급자 순서를 그대로 쓴다(시트 번호와는 별개로 관리).
+  const hasWarningsSheet = warnings.length > 0;
+  const sheetOffset = hasWarningsSheet ? 1 : 0;
+
   const used = new Set();
-  const sheetEntries = residents.map((resident, i) => {
+  const sheetEntries = [];
+  if (hasWarningsSheet) {
+    outFiles["xl/worksheets/sheet1.xml"] = strToU8(buildWarningsSheetXml(warnings));
+    sheetEntries.push({ id: 1, name: "주의사항" });
+    used.add("주의사항");
+  }
+
+  residents.forEach((resident, i) => {
     const seq = i + 1;
+    const sheetNum = seq + sheetOffset;
     const sheetXml = injectResidentValues(templateSheetXml, resident, seq, billingMonth);
-    outFiles[`xl/worksheets/sheet${seq}.xml`] = strToU8(sheetXml);
+    outFiles[`xl/worksheets/sheet${sheetNum}.xml`] = strToU8(sheetXml);
     if (hasStamp) {
       outFiles[`xl/drawings/drawing${seq}.xml`] = drawingXml;
       outFiles[`xl/drawings/_rels/drawing${seq}.xml.rels`] = strToU8(drawingRelsXml);
-      outFiles[`xl/worksheets/_rels/sheet${seq}.xml.rels`] = strToU8(sheetRelsXml(`../drawings/drawing${seq}.xml`));
+      outFiles[`xl/worksheets/_rels/sheet${sheetNum}.xml.rels`] = strToU8(
+        sheetRelsXml(`../drawings/drawing${seq}.xml`)
+      );
     }
-    return { id: seq, name: uniqueSheetName(resident.name, i, used) };
+    sheetEntries.push({ id: sheetNum, name: uniqueSheetName(resident.name, i, used) });
   });
 
+  const totalSheets = residents.length + sheetOffset;
   outFiles["xl/workbook.xml"] = strToU8(buildWorkbookXml(sheetEntries));
-  outFiles["xl/_rels/workbook.xml.rels"] = strToU8(buildWorkbookRelsXml(sheetEntries.length));
-  outFiles["[Content_Types].xml"] = strToU8(buildContentTypesXml(sheetEntries.length, hasStamp ? imageExt : null));
+  outFiles["xl/_rels/workbook.xml.rels"] = strToU8(buildWorkbookRelsXml(totalSheets));
+  outFiles["[Content_Types].xml"] = strToU8(
+    buildContentTypesXml(totalSheets, hasStamp ? residents.length : 0, hasStamp ? imageExt : null)
+  );
 
   const zipped = zipSync(outFiles);
   const blob = new Blob([zipped], {

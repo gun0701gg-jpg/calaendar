@@ -49,7 +49,11 @@ function formulaCell(formula) {
   return { value: formula, type: "Formula", format: ACCOUNTING_FORMAT, ...FONT_STYLE, ...BORDER_STYLE };
 }
 
-export async function downloadAggregateTable(residents, billingMonth) {
+function noteRow(text, columnCount) {
+  return [{ value: text, type: String, ...FONT_STYLE }, ...new Array(columnCount - 1).fill(null)];
+}
+
+export async function downloadAggregateTable(residents, billingMonth, warnings = []) {
   const writeExcelFile = (await import("write-excel-file/browser")).default;
 
   const headerRow = [
@@ -123,12 +127,12 @@ export async function downloadAggregateTable(residents, billingMonth) {
 
   // 경관식 대상자가 있으면 맨 아래에 음영 표시에 대한 주기를 단다.
   const hasTubeFeeding = residents.some((r) => r.isTubeFeeding);
-  const footnoteRow = hasTubeFeeding
-    ? [{ value: "※ 음영 표시: 경관식 대상자", type: String, ...FONT_STYLE }, ...new Array(headerRow.length - 1).fill(null)]
-    : null;
 
   const rows = [headerRow, ...dataRows, blankRow, totalRow];
-  if (footnoteRow) rows.push(footnoteRow);
+  if (hasTubeFeeding) rows.push(noteRow("※ 음영 표시: 경관식 대상자", headerRow.length));
+  // 파일을 읽는 중에 발견된 주의사항(예: 퇴소자 후불 청구 누락 가능성 등)도 맨 아래에 그대로 적어서
+  // 화면 메시지만 보고 놓치는 일이 없게 한다.
+  warnings.forEach((w) => rows.push(noteRow(`※ 주의: ${w}`, headerRow.length)));
 
   await writeExcelFile(rows, {
     sheet: "명세서 집계표",
