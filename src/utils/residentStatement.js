@@ -1,9 +1,13 @@
-// 수급자별 "장기요양급여비용 명세서" 엑셀 생성.
+// "입소비 명세서" 엑셀 생성. 1번 시트는 "입소비 집계표"(관리용), 그 다음부터는 수급자별
+// "장기요양급여비용 명세서"(발송용) 시트다.
 // 수급자현황·상급침실 추가비용·계약의사진찰비·진료약제비·가정간호비 5개 파일(+수급자현황에서 뽑아내는
 // 등급외비용)을 합친 데이터(residentDataMerge.js)를 받아서, 위드온빌리지 자체 명세서 양식으로
 // 수급자 한 명당 시트 하나씩 만들어준다. 서식은 새로 그리지 않고
 // public/templates/resident-statement-template.xlsx의 "명세서(양식)" 시트를 그대로 복제해서 값만
-// 채워 넣기 때문에 글꼴·행높이·열너비·테두리·도장 이미지까지 원본과 완전히 동일하다.
+// 채워 넣기 때문에 글꼴·행높이·열너비·테두리·도장 이미지까지 원본과 완전히 동일하다. 집계표 시트는
+// 같은 양식 파일의 styles.xml에 스타일 몇 개를 이어 붙여서 재사용한다(residentAggregateTable.js).
+import { buildAggregateSheetXml, buildAggregateStyleAdditions } from "./residentAggregateTable.js";
+
 const TEMPLATE_URL = "/templates/resident-statement-template.xlsx";
 const TEMPLATE_SHEET_PATH = "xl/worksheets/sheet2.xml"; // 템플릿 파일 안의 "명세서(양식)" 시트
 const TEMPLATE_DRAWING_PATH = "xl/drawings/drawing1.xml"; // "명세서(양식)" 시트에 걸린 도장 이미지 배치 정보
@@ -264,24 +268,22 @@ function ensureOtherCostLabels(xml) {
   );
 }
 
-// 주의사항이 있으면 맨 앞에 별도 시트로 넣어서, 화면 메시지만 보고 놓치는 일이 없게 한다.
-function buildWarningsSheetXml(warnings) {
-  const lines = ["※ 자동 생성 시 확인이 필요한 주의사항", "", ...warnings];
-  const rows = lines
-    .map((line, i) => {
-      const r = i + 1;
-      return `<row r="${r}"><c r="A${r}" t="inlineStr"><is><t xml:space="preserve">${escapeXmlText(
-        line
-      )}</t></is></c></row>`;
-    })
-    .join("");
-  return (
-    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-    '<cols><col min="1" max="1" width="110" customWidth="1"/></cols>' +
-    `<sheetData>${rows}</sheetData>` +
-    "</worksheet>"
-  );
+// styles.xml 안의 <fills count="N">...</fills>, <cellXfs count="N">...</cellXfs> 같은 "개수 속성 +
+// 목록" 형태 요소 뒤에 새 항목을 이어 붙이고 개수를 늘린다. 기존 번호(인덱스)는 그대로 두고 뒤에만
+// 추가하는 것이라, 수급자별 명세서 시트가 참조하는 기존 스타일 번호와 절대 겹치지 않는다.
+function appendToCountedElement(xml, tagName, addedCount, extraXml) {
+  const re = new RegExp(`(<${tagName} count=")(\\d+)("[^>]*>)([\\s\\S]*?)(</${tagName}>)`);
+  return xml.replace(re, (match, open, count, closeAttr, inner, closeTag) => {
+    return `${open}${Number(count) + addedCount}${closeAttr}${inner}${extraXml}${closeTag}`;
+  });
+}
+
+function patchStylesXmlForAggregateSheet(stylesXml) {
+  const additions = buildAggregateStyleAdditions();
+  let xml = stylesXml;
+  xml = appendToCountedElement(xml, "fills", additions.fillsAdded, additions.fillsXml);
+  xml = appendToCountedElement(xml, "cellXfs", additions.cellXfsAdded, additions.cellXfsXml);
+  return xml;
 }
 
 function downloadBlob(blob, filename) {
@@ -295,7 +297,10 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadResidentStatements(residents, billingMonth, warnings = []) {
+// residents: buildMergedResidentData()가 돌려주는 병합된 수급자 데이터 그대로(가공 전). 1번
+// 시트(입소비 집계표)는 이 데이터를 그대로 쓰고, 수급자별 명세서 시트는 각 항목을
+// residentStatementInputFromMerged로 변환해서 쓴다.
+export async function downloadCombinedStatement(residents, billingMonth, warnings = []) {
   const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
 
   const templateResponse = await fetch(TEMPLATE_URL);
@@ -325,7 +330,7 @@ export async function downloadResidentStatements(residents, billingMonth, warnin
 
   const outFiles = {
     "_rels/.rels": templateFiles["_rels/.rels"],
-    "xl/styles.xml": templateFiles["xl/styles.xml"],
+    "xl/styles.xml": strToU8(patchStylesXmlForAggregateSheet(strFromU8(templateFiles["xl/styles.xml"]))),
     "xl/theme/theme1.xml": templateFiles["xl/theme/theme1.xml"],
     "xl/sharedStrings.xml": templateFiles["xl/sharedStrings.xml"]
   };
@@ -333,23 +338,17 @@ export async function downloadResidentStatements(residents, billingMonth, warnin
     outFiles[`xl/media/${imageFileName}`] = templateFiles[`xl/media/${imageFileName}`];
   }
 
-  // 주의사항이 있으면 맨 앞(시트1)에 별도 시트로 넣고, 수급자별 명세서는 그 뒤로 한 칸씩 밀린다.
-  // 접수번호(receiptNumber)에 쓰는 순번은 수급자 순서 그대로(주의사항 시트 유무와 무관)이고,
-  // 도장 이미지 파일 번호도 수급자 순서를 그대로 쓴다(시트 번호와는 별개로 관리).
-  const hasWarningsSheet = warnings.length > 0;
-  const sheetOffset = hasWarningsSheet ? 1 : 0;
+  // 시트1 = 입소비 집계표(관리용, 주의사항도 표 맨 아래에 같이 들어있음), 시트2부터 = 수급자별
+  // 명세서(발송용). 접수번호(receiptNumber)·도장 이미지 파일 번호는 수급자 순서(1부터)를 쓴다
+  // (시트 번호는 집계표만큼 하나씩 밀려있어서 별도로 관리).
+  outFiles["xl/worksheets/sheet1.xml"] = strToU8(buildAggregateSheetXml(residents, billingMonth, warnings));
+  const sheetEntries = [{ id: 1, name: "입소비 집계표" }];
+  const used = new Set(["입소비 집계표"]);
 
-  const used = new Set();
-  const sheetEntries = [];
-  if (hasWarningsSheet) {
-    outFiles["xl/worksheets/sheet1.xml"] = strToU8(buildWarningsSheetXml(warnings));
-    sheetEntries.push({ id: 1, name: "주의사항" });
-    used.add("주의사항");
-  }
-
-  residents.forEach((resident, i) => {
+  const statementInputs = residents.map(residentStatementInputFromMerged);
+  statementInputs.forEach((resident, i) => {
     const seq = i + 1;
-    const sheetNum = seq + sheetOffset;
+    const sheetNum = seq + 1;
     const sheetXml = injectResidentValues(templateSheetXml, resident, seq, billingMonth);
     outFiles[`xl/worksheets/sheet${sheetNum}.xml`] = strToU8(sheetXml);
     if (hasStamp) {
@@ -362,7 +361,7 @@ export async function downloadResidentStatements(residents, billingMonth, warnin
     sheetEntries.push({ id: sheetNum, name: uniqueSheetName(resident.name, i, used) });
   });
 
-  const totalSheets = residents.length + sheetOffset;
+  const totalSheets = residents.length + 1;
   outFiles["xl/workbook.xml"] = strToU8(buildWorkbookXml(sheetEntries));
   outFiles["xl/_rels/workbook.xml.rels"] = strToU8(buildWorkbookRelsXml(totalSheets));
   outFiles["[Content_Types].xml"] = strToU8(
@@ -373,5 +372,5 @@ export async function downloadResidentStatements(residents, billingMonth, warnin
   const blob = new Blob([zipped], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   });
-  downloadBlob(blob, `수급자명세서_${billingMonth}.xlsx`);
+  downloadBlob(blob, `입소비명세서_${billingMonth}.xlsx`);
 }

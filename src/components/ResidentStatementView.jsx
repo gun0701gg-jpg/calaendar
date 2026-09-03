@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { buildMergedResidentData } from "../utils/residentDataMerge";
-import { downloadAggregateTable } from "../utils/residentAggregateTable";
-import { downloadResidentStatements, residentStatementInputFromMerged } from "../utils/residentStatement";
+import { downloadCombinedStatement } from "../utils/residentStatement";
 import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkError";
 
 const FILE_SLOTS = [
@@ -50,13 +49,8 @@ export default function ResidentStatementView() {
     }
   };
 
-  const handleAggregate = () =>
-    runWithMergedData((residents, warnings) => downloadAggregateTable(residents, billingMonth, warnings));
-
-  const handleStatements = () =>
-    runWithMergedData((residents, warnings) =>
-      downloadResidentStatements(residents.map(residentStatementInputFromMerged), billingMonth, warnings)
-    );
+  const handleGenerate = () =>
+    runWithMergedData((residents, warnings) => downloadCombinedStatement(residents, billingMonth, warnings));
 
   return (
     <div className="statement-view">
@@ -71,7 +65,7 @@ export default function ResidentStatementView() {
    명단을 한 파일에 함께 입력 (경관식 대상자는 간식대를 0원으로 처리)
 3. 계약의사진찰비, 진료약제비, 가정간호비 는 수령한 파일 그대로 첨부
    (여러 개의 시트에 월별 자료가 있는 경우는 해당 월 시트만 남기고 다른 월은 삭제)
-4. 명세서 집계표는 관리용 / 수급자별 명세서는 발송용`}
+4. 생성된 파일 첫 번째 시트는 입소비 집계표(관리용), 그 다음부터는 수급자별 명세서(발송용)`}
       </p>
 
       <label className="form-field">
@@ -103,11 +97,8 @@ export default function ResidentStatementView() {
       )}
 
       <div className="form-actions">
-        <button type="button" className="btn btn--primary" onClick={handleAggregate} disabled={status === "working"}>
-          {status === "working" ? "생성 중..." : "명세서 집계표 생성"}
-        </button>
-        <button type="button" className="btn btn--primary" onClick={handleStatements} disabled={status === "working"}>
-          {status === "working" ? "생성 중..." : "수급자별 명세서 생성"}
+        <button type="button" className="btn btn--primary" onClick={handleGenerate} disabled={status === "working"}>
+          {status === "working" ? "생성 중..." : "입소비 명세서"}
         </button>
       </div>
     </div>
