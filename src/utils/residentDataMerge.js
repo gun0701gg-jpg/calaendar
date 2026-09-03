@@ -162,33 +162,6 @@ function monthSheetLabel(billingMonth) {
   return `${y.slice(2)}.${m}`;
 }
 
-// 이름이 나온 줄에서 가장 오른쪽 숫자 칸을 그 줄의 금액으로 보고, 이름별로 합산한다.
-function sumRowsByName(data, names) {
-  const totals = {};
-  for (const row of data) {
-    let matchedName = null;
-    for (const cell of row) {
-      if (typeof cell === "string" && names.has(cell.trim())) {
-        matchedName = cell.trim();
-        break;
-      }
-    }
-    if (!matchedName) continue;
-
-    let amount = null;
-    for (let i = row.length - 1; i >= 0; i--) {
-      if (typeof row[i] === "number") {
-        amount = row[i];
-        break;
-      }
-    }
-    if (amount === null) continue;
-
-    totals[matchedName] = (totals[matchedName] || 0) + amount;
-  }
-  return totals;
-}
-
 // 시트가 여러 개면(예: 월별 시트) 급여년월과 이름이 같은 시트를 찾아서 쓰고, 못 찾으면 첫 시트를
 // 쓰면서 경고 메시지를 남긴다.
 function chooseSheet(sheets, billingMonth) {
@@ -209,36 +182,55 @@ function chooseSheet(sheets, billingMonth) {
 // 이름 열 머리글로 쓰이는 이름표들. 표(구간)가 여러 개 있는 파일에서도 각 구간의 이름 열을 찾는다.
 const NAME_HEADER_LABELS = ["성명", "대상자", "수급자명"];
 
-// 시트 전체에서 이름 열 머리글을 찾아 그 아래(다음 이름 열 머리글이 나오기 전까지) 각 줄의 이름과
-// 그 줄의 가장 오른쪽 숫자를 모두 모은다. "OO합계" 같은 소계 줄은 이름이 아니라서 제외한다.
+// 시트 전체에서 이름 열 머리글(예: "성명")을 찾아, 그 머리글 줄에서 값이 있는 가장 오른쪽 칸을
+// 그 구간의 "금액 칸" 위치로 정한다. 그 아래(다음 이름 열 머리글이 나오기 전까지) 각 줄은 이름 칸의
+// 이름과, "그 정해진 금액 칸"의 값만 그 줄의 금액으로 본다.
+// (예전에는 "그 줄에서 가장 오른쪽에 있는 숫자"를 금액으로 봤는데, 한 파일 안에 표가 여러 개 있고
+// 금액 칸이 비어있는 경우 생년월일·관리번호 같은 옆 칸의 숫자를 금액으로 잘못 읽는 문제가 있었다.
+// 그래서 반드시 그 표의 머리글에서 정해진 칸 위치만 읽도록 고쳤다.)
+// "OO합계" 같은 소계 줄은 이름 칸에 이름이 아니라서 자연히 제외된다.
 function collectNameAmountPairs(data) {
   const pairs = [];
-  let activeCol = -1;
+  let nameCol = -1;
+  let amountCol = -1;
   for (const row of data) {
     const headerCol = row.findIndex(
       (cell) => typeof cell === "string" && NAME_HEADER_LABELS.includes(cell.trim())
     );
     if (headerCol >= 0) {
-      activeCol = headerCol;
+      nameCol = headerCol;
+      amountCol = -1;
+      for (let i = row.length - 1; i >= 0; i--) {
+        if (row[i] !== null && row[i] !== undefined && row[i] !== "") {
+          amountCol = i;
+          break;
+        }
+      }
       continue;
     }
-    if (activeCol < 0) continue;
+    if (nameCol < 0) continue;
 
-    const name = typeof row[activeCol] === "string" ? row[activeCol].trim() : "";
+    const name = typeof row[nameCol] === "string" ? row[nameCol].trim() : "";
     if (!name || name.includes("합계")) continue;
 
-    let amount = null;
-    for (let i = row.length - 1; i >= 0; i--) {
-      if (typeof row[i] === "number") {
-        amount = row[i];
-        break;
-      }
-    }
+    const raw = amountCol >= 0 ? row[amountCol] : null;
+    const amount = typeof raw === "number" ? raw : 0;
     if (!amount) continue;
 
     pairs.push({ name, amount });
   }
   return pairs;
+}
+
+// collectNameAmountPairs로 구간별 금액 칸을 정확히 짚어 모은 이름·금액 쌍 중, 이 파일에 실제로
+// 있는 수급자(names)에 해당하는 것만 모아 이름별로 합산한다.
+function sumRowsByName(data, names) {
+  const totals = {};
+  for (const { name, amount } of collectNameAmountPairs(data)) {
+    if (!names.has(name)) continue;
+    totals[name] = (totals[name] || 0) + amount;
+  }
+  return totals;
 }
 
 // 계약의사진찰비·진료약제비·가정간호비는 후불로 청구되는 항목이라, 청구서가 도착했을 때는 이미
