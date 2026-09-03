@@ -255,45 +255,41 @@ function unmatchedNamesWarning(pairs, names) {
   return `이번 달 수급자현황(입소중 명단)에 없는 이름의 금액이 있습니다(퇴소 후 후불 청구된 경우일 수 있으니 확인해주세요): ${list}`;
 }
 
-// File2(별도대상자) 안에 상급침실료 표와 함께 들어있는 "경관식 대상자" 구간의 이름들을 모아
-// Set으로 돌려준다(금액 없음). 머리글에 "경관식"이라는 글자가 들어있는 표/구간만 대상으로 보고,
-// 상급침실료 표(수급자명/일요금/월요금)는 "경관식" 글자가 없어서 여기 포함되지 않는다.
+// File2(별도대상자) 안에 상급침실료 표와 "나란히"(좌우로) 들어있는 "경관식" 표의 이름들을 모아
+// Set으로 돌려준다(금액 없음). "경관식" 글자가 있는 칸의 열 위치를 찾고, 그 열과 같거나 오른쪽에
+// 있는 이름 열 머리글("수급자명" 등)을 그 표의 이름 열로 본다(상급침실료 표는 더 왼쪽에 있는
+// 자기 자신의 "수급자명" 열이 있어서, 단순히 첫 번째로 찾은 이름 열을 쓰면 상급침실료 표의 이름
+// 열을 잘못 집게 된다).
 export async function parseTubeFeedingFile(file) {
   const sheets = await readWorkbook(file);
   const data = sheets[0]?.data || [];
 
-  const names = new Set();
-  let nameCol = -1;
-  let inTubeFeedingSection = false;
+  let titleCol = -1;
   for (const row of data) {
-    const hasTubeFeedingLabel = row.some(
-      (cell) => typeof cell === "string" && cell.includes("경관식")
-    );
-    const headerCol = row.findIndex(
-      (cell) => typeof cell === "string" && NAME_HEADER_LABELS.includes(cell.trim())
-    );
-
-    if (hasTubeFeedingLabel) {
-      inTubeFeedingSection = true;
-      if (headerCol >= 0) nameCol = headerCol;
-      continue;
+    const col = row.findIndex((cell) => typeof cell === "string" && cell.includes("경관식"));
+    if (col >= 0) {
+      titleCol = col;
+      break;
     }
-    if (headerCol >= 0) {
-      if (inTubeFeedingSection && nameCol < 0) {
-        // "경관식 대상자" 제목행 다음에 나오는 이름 열 머리글(제목행에만 "경관식" 글자가 있고
-        // 이 머리글 행 자체에는 없는 경우).
-        nameCol = headerCol;
-      } else {
-        // "경관식" 글자가 없는 다른 표의 머리글(상급침실료 표 등)이 나오면 경관식 구간 종료.
-        inTubeFeedingSection = false;
-        nameCol = -1;
-      }
-      continue;
-    }
-    if (!inTubeFeedingSection || nameCol < 0) continue;
+  }
+  if (titleCol < 0) return new Set();
 
+  let nameCol = -1;
+  for (const row of data) {
+    const candidates = row
+      .map((cell, i) => (typeof cell === "string" && NAME_HEADER_LABELS.includes(cell.trim()) ? i : -1))
+      .filter((i) => i >= titleCol);
+    if (candidates.length > 0) {
+      nameCol = Math.min(...candidates);
+      break;
+    }
+  }
+  if (nameCol < 0) return new Set();
+
+  const names = new Set();
+  for (const row of data) {
     const name = typeof row[nameCol] === "string" ? row[nameCol].trim() : "";
-    if (!name || name.includes("합계")) continue;
+    if (!name || name.includes("합계") || NAME_HEADER_LABELS.includes(name)) continue;
     names.add(name);
   }
   return names;
