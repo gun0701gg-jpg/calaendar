@@ -17,6 +17,20 @@ function textCell(value) {
   return { value, type: String, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
 
+// 경관식 대상자는 수급자명 칸에 음영을 넣어 표시한다.
+const TUBE_FEEDING_HIGHLIGHT = { backgroundColor: "#fef08a" };
+
+function nameCell(value, highlight) {
+  return {
+    value,
+    type: String,
+    align: "center",
+    ...FONT_STYLE,
+    ...BORDER_STYLE,
+    ...(highlight ? TUBE_FEEDING_HIGHLIGHT : {})
+  };
+}
+
 function seqCell(value) {
   return { value, type: Number, align: "center", ...FONT_STYLE, ...BORDER_STYLE };
 }
@@ -65,7 +79,7 @@ export async function downloadAggregateTable(residents, billingMonth) {
     return [
       seqCell(r.seq),
       textCell(r.status),
-      textCell(r.name),
+      nameCell(r.name, r.isTubeFeeding),
       textCell(r.grade),
       textCell(r.selfPayRate),
       centeredNumberCell(r.days),
@@ -107,10 +121,17 @@ export async function downloadAggregateTable(residents, billingMonth) {
   // 사이로 딸려 들어가지 않게 한다.
   const blankRow = new Array(headerRow.length).fill(null);
 
-  const monthNumber = Number(billingMonth.split("-")[1]);
+  // 경관식 대상자가 있으면 맨 아래에 음영 표시에 대한 주기를 단다.
+  const hasTubeFeeding = residents.some((r) => r.isTubeFeeding);
+  const footnoteRow = hasTubeFeeding
+    ? [{ value: "※ 음영 표시: 경관식 대상자", type: String, ...FONT_STYLE }, ...new Array(headerRow.length - 1).fill(null)]
+    : null;
 
-  await writeExcelFile([headerRow, ...dataRows, blankRow, totalRow], {
-    sheet: `${monthNumber}월명세서집계표`,
+  const rows = [headerRow, ...dataRows, blankRow, totalRow];
+  if (footnoteRow) rows.push(footnoteRow);
+
+  await writeExcelFile(rows, {
+    sheet: "명세서 집계표",
     columns: columnWidths.map((width) => ({ width }))
   }).toFile(`명세서집계표_${billingMonth}.xlsx`);
 }

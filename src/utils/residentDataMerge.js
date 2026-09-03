@@ -506,7 +506,8 @@ export async function buildMergedResidentData(files, billingMonth) {
   [room.warning, doctor.warning, nursing.warning, pharmacy.warning].forEach((w) => w && warnings.push(w));
 
   const allResidents = rosterWithDays.map((r) => {
-    const amounts = computeGradeBasedAmounts(r, r.days, tubeFeedingNames.has(r.name));
+    const isTubeFeeding = tubeFeedingNames.has(r.name);
+    const amounts = computeGradeBasedAmounts(r, r.days, isTubeFeeding);
     const doctorFeeCost = doctor.totals[r.name] || 0;
     const pharmacyCost = pharmacy.totals[r.name] || 0;
     const nursingCost = nursing.totals[r.name] || 0;
@@ -533,6 +534,7 @@ export async function buildMergedResidentData(files, billingMonth) {
       selfPayRate: r.selfPayRate,
       careNumber: r.careNumber,
       days: r.days,
+      isTubeFeeding,
       insurancePay,
       selfPay,
       mealCost,
