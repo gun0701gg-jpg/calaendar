@@ -41,7 +41,7 @@ export default function ResidentStatementView() {
       }
       await task(residents, warnings);
       setStatus("done");
-      const warningText = warnings.length ? `\n주의: ${warnings.join("\n")}` : "";
+      const warningText = warnings.length ? `\n${warnings.join("\n")}` : "";
       setMessage(`${residents.length}명 처리했습니다.${warningText}`);
     } catch (err) {
       if (isChunkLoadError(err) && reloadForFreshVersion()) return;

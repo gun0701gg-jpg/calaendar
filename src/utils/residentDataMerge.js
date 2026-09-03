@@ -503,7 +503,13 @@ export async function buildMergedResidentData(files, billingMonth) {
     ? await withFileLabel("2.별도대상자(경관식)", () => parseTubeFeedingFile(roomFile))
     : new Set();
 
-  [room.warning, doctor.warning, nursing.warning, pharmacy.warning].forEach((w) => w && warnings.push(w));
+  // 어느 파일에서 나온 주의사항인지 알 수 있도록 파일 이름을 앞에 붙인다.
+  [
+    ["상급침실", room.warning],
+    ["계약의사진찰비", doctor.warning],
+    ["가정간호비", nursing.warning],
+    ["진료약제비", pharmacy.warning]
+  ].forEach(([label, w]) => w && warnings.push(`${label} 주의: ${w}`));
 
   const allResidents = rosterWithDays.map((r) => {
     const isTubeFeeding = tubeFeedingNames.has(r.name);

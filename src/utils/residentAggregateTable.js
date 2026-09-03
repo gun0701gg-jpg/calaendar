@@ -132,7 +132,7 @@ export async function downloadAggregateTable(residents, billingMonth, warnings =
   if (hasTubeFeeding) rows.push(noteRow("※ 음영 표시: 경관식 대상자", headerRow.length));
   // 파일을 읽는 중에 발견된 주의사항(예: 퇴소자 후불 청구 누락 가능성 등)도 맨 아래에 그대로 적어서
   // 화면 메시지만 보고 놓치는 일이 없게 한다.
-  warnings.forEach((w) => rows.push(noteRow(`※ 주의: ${w}`, headerRow.length)));
+  warnings.forEach((w) => rows.push(noteRow(`※ ${w}`, headerRow.length)));
 
   await writeExcelFile(rows, {
     sheet: "명세서 집계표",
