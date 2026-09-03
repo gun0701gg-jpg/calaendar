@@ -7,7 +7,7 @@ import { isChunkLoadError, reloadForFreshVersion } from "../utils/reloadOnChunkE
 
 const FILE_SLOTS = [
   { key: "rosterFile", label: "1. 수급자현황", accept: ".xlsx,.xls" },
-  { key: "roomFile", label: "2. 상급침실 이용에 따른 추가비용", accept: ".xlsx,.xls" },
+  { key: "roomFile", label: "2. 별도대상자(상급침실,경관식)", accept: ".xlsx,.xls" },
   { key: "doctorFile", label: "3. 계약의사진찰비", accept: ".xlsx,.xls" },
   { key: "pharmacyFile", label: "4. 진료약제비", accept: ".pdf" },
   { key: "nursingFile", label: "5. 가정간호비", accept: ".xlsx,.xls" }
@@ -67,7 +67,8 @@ export default function ResidentStatementView() {
       <p className="modal-hint" style={{ whiteSpace: "pre-wrap" }}>
         {`사용안내
 1. 수급자현황 : 케어포 1-8 수급자현황 리포트 (조회기준:연간 선택) - [수급자목록 엑셀 다운로드] 클릭
-2. 상급침실료 : 해당 수급자별 일요금 또는 월요금 입력 (호실 불필요)
+2. 별도대상자(상급침실,경관식) : 상급침실료(일요금 또는 월요금, 호실 불필요)와 경관식 대상자
+   명단을 한 파일에 함께 입력 (경관식 대상자는 간식대를 0원으로 처리)
 3. 계약의사진찰비, 진료약제비, 가정간호비 는 수령한 파일 그대로 첨부
    (여러 개의 시트에 월별 자료가 있는 경우는 해당 월 시트만 남기고 다른 월은 삭제)
 4. 명세서 집계표는 관리용 / 수급자별 명세서는 발송용`}

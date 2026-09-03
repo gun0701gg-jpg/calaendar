@@ -113,9 +113,9 @@ const GRADE_DAILY_RATE = {
   "5등급": 81540,
   등급외: 100000
 };
-// 간식비(1,000×3×일수)는 집계표/명세서에 따로 열을 두지 않고 식사재료비에 합쳐서 표시하기로
-// 해서, 식사재료비 단가에 간식비 단가를 합쳐 넣는다.
-const MEAL_COST_PER_DAY = 4300 * 3 + 1000 + 1000 * 3;
+const MEAL_MATERIAL_COST_PER_DAY = 4300 * 3; // 식사재료비 1일 단가
+const SNACK_COST_PER_DAY = 1000; // 간식대 1일 단가. 경관식 대상자는 간식을 먹지 않아 0으로 처리.
+const BASIC_RECIPIENT_MEAL_SUBSIDY = 426741; // 기초수급자 지자체보조금(고정액, 일수와 무관하게 매달 동일)
 
 function daysInBillingMonth(billingMonth) {
   const [y, m] = billingMonth.split("-").map(Number);
@@ -129,13 +129,21 @@ function parseRateFraction(rateText) {
 
 // 공단부담금 = 등급별 금액 * 일수 * (1-본인부담률), 본인부담금 = 등급별 금액 * 일수 * 본인부담률.
 // 등급외는 공단부담금 개념이 없어서 전액을 등급외 열에 담는다.
-// 식사재료비(간식비 포함)는 등급과 상관없이 실제로 식사를 제공한 만큼 매기는 별도 항목이라
-// 등급외도 똑같이 계산한다. 기초수급자만 지자체보조금 정보가 아직 없어 0으로 비워둔다(추후 직접 입력).
-function computeGradeBasedAmounts(roster, days) {
+// 식사재료비(명세서에는 간식대를 합쳐서 "식사재료비④" 한 칸에 표시)는 등급과 상관없이 실제로
+// 식사를 제공한 만큼 매기는 별도 항목이라 등급외도 똑같이 계산한다.
+// isTubeFeeding: 경관식(경관유동식) 대상자면 간식대를 청구하지 않는다.
+function computeGradeBasedAmounts(roster, days, isTubeFeeding) {
   const dailyRate = GRADE_DAILY_RATE[roster.grade];
   const isBasicRecipient = roster.selfPayCategory === "기초";
   const isGradeExempt = roster.grade === "등급외";
-  const mealCost = isBasicRecipient ? 0 : MEAL_COST_PER_DAY * days;
+
+  const standardMealCost =
+    MEAL_MATERIAL_COST_PER_DAY * days + (isTubeFeeding ? 0 : SNACK_COST_PER_DAY * days);
+  // 기초수급자는 지자체보조금(고정액)이 원칙대로 계산한 식사재료비+간식대보다 크면 0원,
+  // 실제 비용이 보조금보다 크면 그 차액만 청구한다.
+  const mealCost = isBasicRecipient
+    ? Math.max(0, standardMealCost - BASIC_RECIPIENT_MEAL_SUBSIDY)
+    : standardMealCost;
 
   if (dailyRate === undefined) {
     return { insurancePay: 0, selfPay: 0, gradeExemptAmount: 0, mealCost };
@@ -245,6 +253,50 @@ function unmatchedNamesWarning(pairs, names) {
   if (entries.length === 0) return "";
   const list = entries.map(([name, amount]) => `${name}(${amount.toLocaleString()}원)`).join(", ");
   return `이번 달 수급자현황(입소중 명단)에 없는 이름의 금액이 있습니다(퇴소 후 후불 청구된 경우일 수 있으니 확인해주세요): ${list}`;
+}
+
+// File2(별도대상자) 안에 상급침실료 표와 함께 들어있는 "경관식 대상자" 구간의 이름들을 모아
+// Set으로 돌려준다(금액 없음). 머리글에 "경관식"이라는 글자가 들어있는 표/구간만 대상으로 보고,
+// 상급침실료 표(수급자명/일요금/월요금)는 "경관식" 글자가 없어서 여기 포함되지 않는다.
+export async function parseTubeFeedingFile(file) {
+  const sheets = await readWorkbook(file);
+  const data = sheets[0]?.data || [];
+
+  const names = new Set();
+  let nameCol = -1;
+  let inTubeFeedingSection = false;
+  for (const row of data) {
+    const hasTubeFeedingLabel = row.some(
+      (cell) => typeof cell === "string" && cell.includes("경관식")
+    );
+    const headerCol = row.findIndex(
+      (cell) => typeof cell === "string" && NAME_HEADER_LABELS.includes(cell.trim())
+    );
+
+    if (hasTubeFeedingLabel) {
+      inTubeFeedingSection = true;
+      if (headerCol >= 0) nameCol = headerCol;
+      continue;
+    }
+    if (headerCol >= 0) {
+      if (inTubeFeedingSection && nameCol < 0) {
+        // "경관식 대상자" 제목행 다음에 나오는 이름 열 머리글(제목행에만 "경관식" 글자가 있고
+        // 이 머리글 행 자체에는 없는 경우).
+        nameCol = headerCol;
+      } else {
+        // "경관식" 글자가 없는 다른 표의 머리글(상급침실료 표 등)이 나오면 경관식 구간 종료.
+        inTubeFeedingSection = false;
+        nameCol = -1;
+      }
+      continue;
+    }
+    if (!inTubeFeedingSection || nameCol < 0) continue;
+
+    const name = typeof row[nameCol] === "string" ? row[nameCol].trim() : "";
+    if (!name || name.includes("합계")) continue;
+    names.add(name);
+  }
+  return names;
 }
 
 // File2(계약의사진찰비)/File4(가정간호비) 공용 파서.
@@ -435,7 +487,7 @@ export async function buildMergedResidentData(files, billingMonth) {
 
   const [room, doctor, nursing] = await Promise.all([
     roomFile
-      ? withFileLabel("2.상급침실", () => sumRoomUpgradeFile(roomFile, rosterWithDays, billingMonth))
+      ? withFileLabel("2.별도대상자(상급침실)", () => sumRoomUpgradeFile(roomFile, rosterWithDays, billingMonth))
       : { totals: {}, warning: "" },
     doctorFile
       ? withFileLabel("3.계약의사진찰비", () => sumCostFile(doctorFile, roster, billingMonth))
@@ -447,11 +499,14 @@ export async function buildMergedResidentData(files, billingMonth) {
   const pharmacy = pharmacyFile
     ? await withFileLabel("4.진료약제비", () => sumPharmacyPdf(pharmacyFile, roster))
     : { totals: {}, warning: "" };
+  const tubeFeedingNames = roomFile
+    ? await withFileLabel("2.별도대상자(경관식)", () => parseTubeFeedingFile(roomFile))
+    : new Set();
 
   [room.warning, doctor.warning, nursing.warning, pharmacy.warning].forEach((w) => w && warnings.push(w));
 
   const allResidents = rosterWithDays.map((r) => {
-    const amounts = computeGradeBasedAmounts(r, r.days);
+    const amounts = computeGradeBasedAmounts(r, r.days, tubeFeedingNames.has(r.name));
     const doctorFeeCost = doctor.totals[r.name] || 0;
     const pharmacyCost = pharmacy.totals[r.name] || 0;
     const nursingCost = nursing.totals[r.name] || 0;
