@@ -537,6 +537,7 @@ export async function buildMergedResidentData(files, billingMonth) {
       careNumber: r.careNumber,
       days: r.days,
       isTubeFeeding,
+      alreadyGone,
       insurancePay,
       selfPay,
       mealCost,

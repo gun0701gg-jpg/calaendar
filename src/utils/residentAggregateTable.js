@@ -75,11 +75,30 @@ export async function downloadAggregateTable(residents, billingMonth, warnings =
     "이전미납액",
     "선납적용액",
     "총청구액",
-    "당월입금액"
+    "당월입금액",
+    "경관식"
   ].map(headerCell);
 
+  // 공단부담금·본인부담금·식사재료비는 계산 과정을 표에서 그대로 확인/검증할 수 있도록 값이 아닌
+  // 수식으로 넣는다(등급 D열/본인부담률 E열/일수 F열/경관식 T열을 참조). 기초수급자는 본인부담률이
+  // 0%인 사람으로 본다. 다만 이번 달이 시작되기 전에 이미 퇴소한 사람은 애초에 청구 대상이 아니라
+  // 수식으로 표현할 근거 열이 없어서, 그 경우만 예외적으로 0을 값 그대로 넣는다.
   const dataRows = residents.map((r, i) => {
     const row = i + 2; // 1행은 헤더
+    const gradeRate = `IF(D${row}="1등급",93070,IF(OR(D${row}="2등급",D${row}="3등급",D${row}="4등급",D${row}="5등급"),81540,0))`;
+    const rateFraction = `IFERROR(VALUE(SUBSTITUTE(E${row},"%",""))/100,0)`;
+    const mealBase = `(4300*3*F${row})+IF(T${row}="O",0,1000*F${row})`;
+
+    const insurancePayCell = r.alreadyGone
+      ? numberCell(0)
+      : formulaCell(`IF(D${row}="등급외",0,${gradeRate}*F${row}*(1-${rateFraction}))`);
+    const selfPayCell = r.alreadyGone
+      ? numberCell(0)
+      : formulaCell(`IF(D${row}="등급외",0,${gradeRate}*F${row}*${rateFraction})`);
+    const mealCostCell = r.alreadyGone
+      ? numberCell(0)
+      : formulaCell(`IF(E${row}="0%",MAX(0,${mealBase}-426741),${mealBase})`);
+
     return [
       seqCell(r.seq),
       textCell(r.status),
@@ -87,9 +106,9 @@ export async function downloadAggregateTable(residents, billingMonth, warnings =
       textCell(r.grade),
       textCell(r.selfPayRate),
       centeredNumberCell(r.days),
-      numberCell(r.insurancePay),
-      numberCell(r.selfPay),
-      numberCell(r.mealCost), // 간식비 포함
+      insurancePayCell,
+      selfPayCell,
+      mealCostCell, // 간식비 포함
       numberCell(r.roomUpgradeCost),
       numberCell(r.pharmacyCost),
       numberCell(r.doctorFeeCost),
@@ -99,7 +118,8 @@ export async function downloadAggregateTable(residents, billingMonth, warnings =
       numberCell(0), // 이전미납액
       numberCell(0), // 선납적용액
       formulaCell(`O${row}+P${row}-Q${row}`),
-      numberCell(0) // 당월입금액
+      numberCell(0), // 당월입금액
+      textCell(r.isTubeFeeding ? "O" : "")
     ];
   });
 
@@ -115,11 +135,12 @@ export async function downloadAggregateTable(residents, billingMonth, warnings =
     textCell(""),
     ...["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"].map((col) =>
       formulaCell(`SUM(${col}2:${col}${lastDataRow})`)
-    )
+    ),
+    textCell("") // T(경관식)는 합계 대상이 아님
   ];
 
-  // A~F는 기존 넓이를 유지하고, G~S(공단부담금~당월입금액)는 모두 12로 통일한다.
-  const columnWidths = [6, 8, 10, 8, 10, 6, ...Array(13).fill(12)];
+  // A~F는 기존 넓이를 유지하고, G~T(공단부담금~경관식)는 모두 12로 통일한다.
+  const columnWidths = [6, 8, 10, 8, 10, 6, ...Array(14).fill(12)];
 
   // 합계 행 위에 빈 줄을 하나 두어서, 나중에 데이터 영역만 정렬(sorting)해도 합계 행이 데이터
   // 사이로 딸려 들어가지 않게 한다.
