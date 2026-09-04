@@ -104,8 +104,13 @@ function titleText(billingMonth) {
 // 수식으로 넣는다(등급 D열/본인부담률 E열/일수 F열/경관식 T열을 참조). 기초수급자는 본인부담률이
 // 0%인 사람으로 본다. 다만 이번 달이 시작되기 전에 이미 퇴소한 사람은 애초에 청구 대상이 아니라
 // 수식으로 표현할 근거 열이 없어서, 그 경우만 예외적으로 0을 값 그대로 넣는다.
+// 등급별 1일 단가: 1등급 93,070 / 2등급 86,340 / 3~5등급 81,540 (residentDataMerge.js의
+// GRADE_DAILY_RATE와 동일한 값).
 function gradeRateFormula(row) {
-  return `IF(D${row}="1등급",93070,IF(OR(D${row}="2등급",D${row}="3등급",D${row}="4등급",D${row}="5등급"),81540,0))`;
+  return (
+    `IF(D${row}="1등급",93070,IF(D${row}="2등급",86340,` +
+    `IF(OR(D${row}="3등급",D${row}="4등급",D${row}="5등급"),81540,0)))`
+  );
 }
 
 function rateFractionFormula(row) {
